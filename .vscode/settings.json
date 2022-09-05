@@ -1,0 +1,10 @@
+{
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "*.go": "${capture}_test.go,${capture}_windows.go,${capture}_other.go",
+    "go.mod": "go.sum"
+  },
+  "go.testEnvVars": {
+    "REDIS_CONNSTR": "redis://test@127.0.0.1:6379/0"
+  }
+}
