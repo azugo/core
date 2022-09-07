@@ -124,8 +124,10 @@ func (c *Configuration) Load(cmd *cobra.Command, config any, environment string)
 		extbind.Bind("", c.v)
 	}
 
-	if extbind, ok := config.(CmdBinder); ok {
-		extbind.BindCmd(cmd, c.v)
+	if cmd != nil {
+		if extbind, ok := config.(CmdBinder); ok {
+			extbind.BindCmd(cmd, c.v)
+		}
 	}
 
 	// Load configuration
