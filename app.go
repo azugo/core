@@ -100,6 +100,14 @@ func (a *App) SetConfig(cmd *cobra.Command, conf *config.Configuration) {
 	a.config = conf
 }
 
+// ReplaceLogger replaces current application logger with custom.
+//
+// WARNING: This can be used only when application has been already initialized.
+func (a *App) ReplaceLogger(logger *zap.Logger) error {
+	a.logger = logger
+	return a.initLogger()
+}
+
 // Config returns application configuration.
 //
 // Panics if configuration is not loaded.

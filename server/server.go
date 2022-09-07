@@ -44,7 +44,7 @@ func New(cmd *cobra.Command, opt ServerOptions) (*core.App, error) {
 	a.SetConfig(cmd, conf)
 
 	// Load configuration
-	if err := conf.Load(c, string(a.Env())); err != nil {
+	if err := conf.Load(cmd, c, string(a.Env())); err != nil {
 		return nil, err
 	}
 

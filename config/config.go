@@ -10,6 +10,7 @@ import (
 
 	"azugo.io/core/validation"
 
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
@@ -41,6 +42,12 @@ func New() *Configuration {
 // sections to bind to configuration file.
 type Binder interface {
 	Bind(prefix string, v *viper.Viper)
+}
+
+// CmdBinder is an interface that can be implemented by configuration
+// sections to bind to command line arguments.
+type CmdBinder interface {
+	BindCmd(cmd *cobra.Command, v *viper.Viper)
 }
 
 // Configurable is an interface that can be implemented by
@@ -99,7 +106,7 @@ func (c *Configuration) SetConfigName(name string) {
 }
 
 // Load loads the configuration from the provided path.
-func (c *Configuration) Load(config any, environment string) error {
+func (c *Configuration) Load(cmd *cobra.Command, config any, environment string) error {
 	if c.loaded {
 		return nil
 	}
@@ -115,6 +122,10 @@ func (c *Configuration) Load(config any, environment string) error {
 
 	if extbind, ok := config.(Binder); ok {
 		extbind.Bind("", c.v)
+	}
+
+	if extbind, ok := config.(CmdBinder); ok {
+		extbind.BindCmd(cmd, c.v)
 	}
 
 	// Load configuration
