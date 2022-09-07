@@ -49,7 +49,7 @@ func TestApp(t *testing.T) {
 		App: a,
 	}
 
-	go core.Run(app)
+	go server.Run(app)
 	time.Sleep(100 * time.Millisecond)
 
 	assert.True(t, app.Config().Ready())
