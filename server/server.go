@@ -18,7 +18,8 @@ type ServerOptions struct {
 	AppName string
 	// AppVer is the version of the application.
 	AppVer string
-	// AppBuiltWith
+	// AppBuiltWith is the server build tags.
+	AppBuiltWith string
 
 	// Configuration object that implements config.Configurable interface.
 	Configuration any
@@ -28,7 +29,7 @@ type ServerOptions struct {
 func New(cmd *cobra.Command, opt ServerOptions) (*core.App, error) {
 	a := core.New()
 	a.AppName = opt.AppName
-	a.SetVersion(opt.AppVer, "")
+	a.SetVersion(opt.AppVer, opt.AppBuiltWith)
 
 	// Support extended configuration.
 	var conf *config.Configuration
