@@ -16,6 +16,7 @@ func (a *App) initCache() error {
 	conf := a.Config().Cache
 	opts := []cache.CacheOption{
 		conf.Type,
+		cache.Instrumenter(a.Instrumenter()),
 	}
 	if conf.TTL > 0 {
 		opts = append(opts, cache.DefaultTTL(conf.TTL))

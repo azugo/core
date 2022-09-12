@@ -9,21 +9,36 @@ import (
 	"fmt"
 	"sync"
 
+	"azugo.io/core/instrumenter"
+
 	"github.com/lafriks/ttlcache/v3"
 )
 
 type memoryCache[T any] struct {
-	cache  *ttlcache.Cache[string, T]
-	lock   sync.Mutex
-	loader func(ctx context.Context, key string) (interface{}, error)
+	cache        *ttlcache.Cache[string, T]
+	lock         sync.Mutex
+	loader       func(ctx context.Context, key string) (interface{}, error)
+	instrumenter instrumenter.Instrumenter
 }
 
 func newMemoryCache[T any](opts ...CacheOption) (CacheInstance[T], error) {
 	opt := newCacheOptions(opts...)
 	c := ttlcache.New(ttlcache.WithTTL[string, T](opt.TTL))
+
+	loader := opt.Loader
+	if loader != nil {
+		loader = func(ctx context.Context, key string) (interface{}, error) {
+			finish := opt.Instrumenter.Observe(ctx, InstrumentationCacheLoader, key)
+			v, err := opt.Loader(ctx, key)
+			finish(err)
+			return v, err
+		}
+	}
+
 	return &memoryCache[T]{
-		cache:  c,
-		loader: opt.Loader,
+		cache:        c,
+		loader:       loader,
+		instrumenter: opt.Instrumenter,
 	}, nil
 }
 
@@ -59,13 +74,18 @@ func (c *memoryCache[T]) Get(ctx context.Context, key string, opts ...ItemOption
 		cacheOpts = append(cacheOpts, ttlcache.WithLoader[string, T](c.getLoader(ctx, opts...)))
 	}
 
+	finish := c.instrumenter.Observe(ctx, InstrumentationCacheGet, key)
+
 	i, err := c.cache.Get(key, cacheOpts...)
 	if err != nil || i == nil {
+		finish(err)
 		return val, err
 	}
 	if i.IsExpired() {
+		finish(nil)
 		return val, nil
 	}
+	finish(nil)
 	return i.Value(), nil
 }
 
@@ -78,14 +98,19 @@ func (c *memoryCache[T]) Pop(ctx context.Context, key string) (T, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	finish := c.instrumenter.Observe(ctx, InstrumentationCacheGet, key)
+
 	i, err := c.cache.Get(key)
 	if err != nil {
+		finish(err)
 		return val, err
 	}
 	if i == nil || i.IsExpired() {
+		finish(nil)
 		return val, ErrKeyNotFound{Key: key}
 	}
 	c.cache.Delete(key)
+	finish(nil)
 	return i.Value(), nil
 }
 
@@ -98,6 +123,10 @@ func (c *memoryCache[T]) Set(ctx context.Context, key string, value T, opts ...I
 	if ttl == 0 {
 		ttl = ttlcache.DefaultTTL
 	}
+
+	finish := c.instrumenter.Observe(ctx, InstrumentationCacheSet, key)
+	defer finish(nil)
+
 	_ = c.cache.Set(key, value, ttl)
 	return nil
 }
@@ -106,6 +135,10 @@ func (c *memoryCache[T]) Delete(ctx context.Context, key string) error {
 	if c.cache == nil {
 		return ErrCacheClosed
 	}
+
+	finish := c.instrumenter.Observe(ctx, InstrumentationCacheDelete, key)
+	defer finish(nil)
+
 	c.cache.Delete(key)
 	return nil
 }

@@ -11,6 +11,7 @@ import (
 
 	"azugo.io/core/cache"
 	"azugo.io/core/config"
+	"azugo.io/core/instrumenter"
 	"azugo.io/core/validation"
 
 	"github.com/spf13/cobra"
@@ -41,6 +42,9 @@ type App struct {
 	tasks   []Tasker
 	started bool
 
+	// Instrumenter
+	instrumenter instrumenter.Instrumenter
+
 	// App settings
 	AppVer       string
 	AppBuiltWith string
@@ -57,6 +61,8 @@ func New() *App {
 		bgstop: stop,
 
 		tasks: make([]Tasker, 0),
+
+		instrumenter: instrumenter.NullInstrumenter,
 
 		validate: validation.New(),
 	}
@@ -113,6 +119,20 @@ func (a *App) Config() *config.Configuration {
 		panic("configuration is not loaded")
 	}
 	return a.config
+}
+
+// Instrumentation defines callback to be used as instrumenter.
+func (a *App) Instrumentation(instr instrumenter.Instrumenter) {
+	if instr == nil {
+		a.instrumenter = instrumenter.NullInstrumenter
+		return
+	}
+	a.instrumenter = instr
+}
+
+// Instrumenter returns application instrumentation callback.
+func (a *App) Instrumenter() instrumenter.Instrumenter {
+	return a.instrumenter
 }
 
 // Start web application.

@@ -22,6 +22,10 @@ func (t *testTask) Stop() {
 	t.started = false
 }
 
+func (t *testTask) Name() string {
+	return "test"
+}
+
 type testErrTask struct{}
 
 func (t *testErrTask) Start(_ context.Context) error {
@@ -29,6 +33,10 @@ func (t *testErrTask) Start(_ context.Context) error {
 }
 
 func (t *testErrTask) Stop() {}
+
+func (t *testErrTask) Name() string {
+	return "err-test"
+}
 
 func TestTaskStart(t *testing.T) {
 	a, cleanup, _, err := newTestApp()

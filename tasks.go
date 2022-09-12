@@ -12,6 +12,8 @@ type Tasker interface {
 	Start(ctx context.Context) error
 	// Stop task
 	Stop()
+	// Name returns task name
+	Name() string
 }
 
 func (a *App) startTasks() error {

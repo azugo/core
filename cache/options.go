@@ -7,6 +7,8 @@ package cache
 import (
 	"context"
 	"time"
+
+	"azugo.io/core/instrumenter"
 )
 
 type cacheOptions struct {
@@ -16,6 +18,7 @@ type cacheOptions struct {
 	ConnectionPassword string
 	KeyPrefix          string
 	Loader             func(ctx context.Context, key string) (interface{}, error)
+	Instrumenter       instrumenter.Instrumenter
 }
 
 // CacheOption is an option for the cache instance.
@@ -106,4 +109,11 @@ type Loader func(ctx context.Context, key string) (any, error)
 
 func (l Loader) applyCache(c *cacheOptions) {
 	c.Loader = l
+}
+
+// Instrumenter is a function that instruments cache operations.
+type Instrumenter instrumenter.Instrumenter
+
+func (i Instrumenter) applyCache(c *cacheOptions) {
+	c.Instrumenter = instrumenter.Instrumenter(i)
 }

@@ -12,6 +12,16 @@ import (
 	"github.com/go-redis/redis/v9"
 )
 
+const (
+	InstrumentationCacheStart  = "cache-start"
+	InstrumentationCacheClose  = "cache-close"
+	InstrumentationCachePing   = "cache-ping"
+	InstrumentationCacheGet    = "cache-get"
+	InstrumentationCacheLoader = "cache-loader"
+	InstrumentationCacheSet    = "cache-set"
+	InstrumentationCacheDelete = "cache-delete"
+)
+
 var ErrCacheClosed = errors.New("cache closed")
 
 type ErrKeyNotFound struct {
@@ -65,20 +75,29 @@ type CacheInstancePinger interface {
 // Start cache.
 func (c *Cache) Start() error {
 	opt := newCacheOptions(c.options...)
+
+	finish := opt.Instrumenter.Observe(context.Background(), InstrumentationCacheStart)
+
 	if opt.Type == RedisCache {
 		con, err := newRedisClient(opt.ConnectionString, opt.ConnectionPassword)
 		if err != nil {
+			finish(err)
 			return err
 		}
 		c.redisCon = con
 		c.redisConStr = opt.ConnectionString
 	}
+	finish(nil)
 	return nil
 }
 
 // Close cache and all its instances.
 func (c *Cache) Close() {
 	opt := newCacheOptions(c.options...)
+
+	finish := opt.Instrumenter.Observe(context.Background(), InstrumentationCacheClose)
+	defer finish(nil)
+
 	if opt.Type == RedisCache {
 		_ = c.redisCon.Close()
 		c.redisCon = nil
@@ -94,18 +113,24 @@ func (c *Cache) Close() {
 // Ping cache and all its instances.
 func (c *Cache) Ping(ctx context.Context) error {
 	opt := newCacheOptions(c.options...)
+
+	finish := opt.Instrumenter.Observe(ctx, InstrumentationCachePing)
+
 	if opt.Type == RedisCache && c.redisCon != nil {
 		if s := c.redisCon.Ping(ctx); s != nil && s.Err() != nil {
+			finish(s.Err())
 			return s.Err()
 		}
 	}
 	for _, i := range c.cache {
 		if c, ok := i.(CacheInstancePinger); ok {
 			if err := c.Ping(ctx); err != nil {
+				finish(err)
 				return err
 			}
 		}
 	}
+	finish(nil)
 	return nil
 }
 
