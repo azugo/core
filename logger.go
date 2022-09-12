@@ -16,10 +16,8 @@ import (
 
 var canColorStdout = false
 
-func (a *App) initLogger() error {
-	if a.logger != nil {
-		return nil
-	}
+func (a *App) loggerFields() []zap.Field {
+	// TODO: add additional fields for logger
 
 	fields := make([]zap.Field, 0, 3)
 	if a.AppName != "" {
@@ -30,7 +28,13 @@ func (a *App) initLogger() error {
 	}
 	fields = append(fields, zap.String("service.environment", strings.ToLower(string(a.Env()))))
 
-	// TODO: add additional fields for logger
+	return fields
+}
+
+func (a *App) initLogger() error {
+	if a.logger != nil {
+		return nil
+	}
 
 	if canColorStdout && a.Env().IsDevelopment() {
 		conf := zap.NewDevelopmentEncoderConfig()
@@ -44,7 +48,7 @@ func (a *App) initLogger() error {
 			),
 			zap.AddCaller(),
 			zap.AddStacktrace(zap.ErrorLevel),
-		).With(fields...)
+		).With(a.loggerFields()...)
 
 		return nil
 	}
@@ -52,11 +56,20 @@ func (a *App) initLogger() error {
 	encoderConfig := ecszap.NewDefaultEncoderConfig()
 	core := ecszap.NewCore(encoderConfig, os.Stdout, zap.InfoLevel)
 
-	a.logger = zap.New(core, zap.AddCaller()).With(fields...)
+	a.logger = zap.New(core, zap.AddCaller()).With(a.loggerFields()...)
 
 	return nil
 }
 
+// ReplaceLogger replaces current application logger with custom.
+//
+// Default fields are automatically added to the logger.
+func (a *App) ReplaceLogger(logger *zap.Logger) error {
+	a.logger = logger.With(a.loggerFields()...)
+	return a.initLogger()
+}
+
+// Log returns application logger.
 func (a *App) Log() *zap.Logger {
 	if a.logger == nil {
 		if err := a.initLogger(); err != nil {

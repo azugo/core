@@ -7,6 +7,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"azugo.io/core/cache"
 	"azugo.io/core/config"
@@ -35,6 +36,11 @@ type App struct {
 	// Cache
 	cache *cache.Cache
 
+	// Tasks
+	stlock  sync.RWMutex
+	tasks   []Tasker
+	started bool
+
 	// App settings
 	AppVer       string
 	AppBuiltWith string
@@ -49,6 +55,8 @@ func New() *App {
 
 		bgctx:  ctx,
 		bgstop: stop,
+
+		tasks: make([]Tasker, 0),
 
 		validate: validation.New(),
 	}
@@ -97,14 +105,6 @@ func (a *App) SetConfig(cmd *cobra.Command, conf *config.Configuration) {
 	a.config = conf
 }
 
-// ReplaceLogger replaces current application logger with custom.
-//
-// WARNING: This can be used only when application has been already initialized.
-func (a *App) ReplaceLogger(logger *zap.Logger) error {
-	a.logger = logger
-	return a.initLogger()
-}
-
 // Config returns application configuration.
 //
 // Panics if configuration is not loaded.
@@ -123,6 +123,9 @@ func (a *App) Start() error {
 	if err := a.initCache(); err != nil {
 		return err
 	}
+	if err := a.startTasks(); err != nil {
+		return err
+	}
 
 	a.Log().Info(fmt.Sprintf("Starting %s...", a.String()))
 
@@ -132,6 +135,8 @@ func (a *App) Start() error {
 // Stop application and its services
 func (a *App) Stop() {
 	a.bgstop()
+
+	a.stopTasks()
 
 	a.closeCache()
 }

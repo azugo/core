@@ -1,66 +1,49 @@
-package core_test
+package core
 
 import (
-	"context"
 	"os"
-	"sync"
 	"testing"
-	"time"
 
-	"azugo.io/core"
-	"azugo.io/core/cache"
-	"azugo.io/core/server"
+	"azugo.io/core/config"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type App struct {
-	*core.App
+func newTestApp() (*App, func(), *observer.ObservedLogs, error) {
+	os.Setenv("ENVIRONMENT", string(EnvironmentDevelopment))
+	a := New()
 
-	wg sync.WaitGroup
-}
-
-func (a *App) Start() error {
-	if err := a.App.Start(); err != nil {
-		return err
+	conf := config.New()
+	if err := conf.Load(nil, conf, string(a.Env())); err != nil {
+		return nil, func() {}, nil, err
 	}
+	a.AppName = "Test"
+	a.SetVersion("1.0.0", "test")
+	a.SetConfig(nil, conf)
 
-	a.wg.Add(1)
+	observedZapCore, observedLogs := observer.New(zap.InfoLevel)
+	a.ReplaceLogger(zap.New(observedZapCore))
 
-	// Start should not exit
-	<-(chan int)(nil)
-	return nil
+	return a, func() {
+		a.Stop()
+		_ = os.Unsetenv("ENVIRONMENT")
+	}, observedLogs, nil
 }
 
-func (a *App) Stop() {
-	a.App.Stop()
-
-	a.wg.Done()
-}
-
-func TestApp(t *testing.T) {
-	a, err := server.New(nil, server.ServerOptions{
-		AppName: "Test",
-		AppVer:  "1.0.0",
-	})
+func TestNewApp(t *testing.T) {
+	a, cleanup, logs, err := newTestApp()
 	require.NoError(t, err)
-	app := &App{
-		App: a,
-	}
+	require.NotNil(t, a)
 
-	go server.Run(app)
-	time.Sleep(100 * time.Millisecond)
+	t.Cleanup(cleanup)
 
-	assert.True(t, app.Config().Ready())
-	assert.Equal(t, cache.MemoryCache, a.Config().Cache.Type)
-	assert.Equal(t, core.EnvironmentProduction, app.Env())
-	assert.NoError(t, a.Cache().Ping(context.TODO()))
+	assert.NoError(t, a.Start())
 
-	// Signal interrupt to stop app
-	proc, err := os.FindProcess(os.Getpid())
-	require.NoError(t, err)
-	proc.Signal(os.Interrupt)
-	// Wait for app to finish
-	app.wg.Wait()
+	assert.Equal(t, EnvironmentDevelopment, a.Env())
+	assert.Len(t, logs.All(), 1)
+	assert.Equal(t, "Starting Test 1.0.0 (built with test)...", logs.All()[0].Message)
+	assert.Equal(t, "Test 1.0.0 (built with test)", a.String())
 }
