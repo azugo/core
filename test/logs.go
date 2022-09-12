@@ -9,7 +9,7 @@ import (
 
 func ObservedLogs(a *core.App) *observer.ObservedLogs {
 	observedZapCore, observedLogs := observer.New(zap.InfoLevel)
-	a.ReplaceLogger(zap.New(observedZapCore))
+	_ = a.ReplaceLogger(zap.New(observedZapCore))
 
 	return observedLogs
 }

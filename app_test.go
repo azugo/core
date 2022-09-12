@@ -25,7 +25,9 @@ func newTestApp() (*App, func(), *observer.ObservedLogs, error) {
 	a.SetConfig(nil, conf)
 
 	observedZapCore, observedLogs := observer.New(zap.InfoLevel)
-	a.ReplaceLogger(zap.New(observedZapCore))
+	if err := a.ReplaceLogger(zap.New(observedZapCore)); err != nil {
+		return nil, func() {}, nil, err
+	}
 
 	return a, func() {
 		a.Stop()
