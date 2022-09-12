@@ -6,5 +6,6 @@
   },
   "go.testEnvVars": {
     "REDIS_CONNSTR": "redis://test@127.0.0.1:6379/0"
-  }
+  },
+  "go.lintTool": "golangci-lint"
 }

@@ -73,6 +73,7 @@ func (t DefaultTTL) applyCache(c *cacheOptions) {
 // TTL represents time to keep item in cache.
 type TTL[T any] time.Duration
 
+//nolint:unused
 func (t TTL[T]) applyItem(c *itemOptions[T]) {
 	c.TTL = time.Duration(t)
 }

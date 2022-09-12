@@ -85,3 +85,22 @@ func TestMemoryCacheExpire(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Empty(t, val)
 }
+
+func TestMemoryCacheItemExpire(t *testing.T) {
+	c := New(CacheType(MemoryCache))
+	err := c.Start()
+	require.NoError(t, err)
+	defer c.Close()
+
+	i, err := Create[string](c, "test")
+	require.NoError(t, err)
+
+	err = i.Set(context.TODO(), "key", "value", TTL[string](100*time.Millisecond))
+	assert.NoError(t, err)
+
+	time.Sleep(150 * time.Millisecond)
+
+	val, err := i.Get(context.TODO(), "key")
+	assert.NoError(t, err)
+	assert.Empty(t, val)
+}
