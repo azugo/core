@@ -21,7 +21,7 @@ func TestReidsCacheGetSet(t *testing.T) {
 		return
 	}
 	c := New(CacheType(RedisCache), KeyPrefix("prefix"), ConnectionString(cs))
-	err := c.Start()
+	err := c.Start(context.TODO())
 	require.NoError(t, err)
 	defer c.Close()
 
@@ -43,7 +43,7 @@ func TestRedisCachePop(t *testing.T) {
 		return
 	}
 	c := New(CacheType(RedisCache), ConnectionString(cs))
-	err := c.Start()
+	err := c.Start(context.TODO())
 	require.NoError(t, err)
 	defer c.Close()
 
@@ -69,7 +69,7 @@ func TestRedisCacheDelete(t *testing.T) {
 		return
 	}
 	c := New(CacheType(RedisCache), ConnectionString(cs))
-	err := c.Start()
+	err := c.Start(context.TODO())
 	require.NoError(t, err)
 	defer c.Close()
 
@@ -94,7 +94,7 @@ func TestRedisCacheExpire(t *testing.T) {
 		return
 	}
 	c := New(CacheType(RedisCache), ConnectionString(cs))
-	err := c.Start()
+	err := c.Start(context.TODO())
 	require.NoError(t, err)
 	defer c.Close()
 

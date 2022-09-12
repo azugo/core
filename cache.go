@@ -32,7 +32,7 @@ func (a *App) initCache() error {
 	}
 	a.cache = cache.New(opts...)
 
-	return a.cache.Start()
+	return a.cache.Start(a.BackgroundContext())
 }
 
 func (a *App) closeCache() {

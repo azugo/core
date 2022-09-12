@@ -11,7 +11,7 @@ import (
 
 func TestMemoryCacheGetSet(t *testing.T) {
 	c := New(CacheType(MemoryCache))
-	err := c.Start()
+	err := c.Start(context.TODO())
 	require.NoError(t, err)
 	defer c.Close()
 
@@ -28,7 +28,7 @@ func TestMemoryCacheGetSet(t *testing.T) {
 
 func TestMemoryCachePop(t *testing.T) {
 	c := New(CacheType(MemoryCache))
-	err := c.Start()
+	err := c.Start(context.TODO())
 	require.NoError(t, err)
 	defer c.Close()
 
@@ -49,7 +49,7 @@ func TestMemoryCachePop(t *testing.T) {
 
 func TestMemoryCacheDelete(t *testing.T) {
 	c := New(CacheType(MemoryCache))
-	err := c.Start()
+	err := c.Start(context.TODO())
 	require.NoError(t, err)
 	defer c.Close()
 
@@ -69,7 +69,7 @@ func TestMemoryCacheDelete(t *testing.T) {
 
 func TestMemoryCacheExpire(t *testing.T) {
 	c := New(CacheType(MemoryCache))
-	err := c.Start()
+	err := c.Start(context.TODO())
 	require.NoError(t, err)
 	defer c.Close()
 
@@ -88,7 +88,7 @@ func TestMemoryCacheExpire(t *testing.T) {
 
 func TestMemoryCacheItemExpire(t *testing.T) {
 	c := New(CacheType(MemoryCache))
-	err := c.Start()
+	err := c.Start(context.TODO())
 	require.NoError(t, err)
 	defer c.Close()
 

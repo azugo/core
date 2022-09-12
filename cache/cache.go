@@ -73,10 +73,10 @@ type CacheInstancePinger interface {
 }
 
 // Start cache.
-func (c *Cache) Start() error {
+func (c *Cache) Start(ctx context.Context) error {
 	opt := newCacheOptions(c.options...)
 
-	finish := opt.Instrumenter.Observe(context.Background(), InstrumentationCacheStart)
+	finish := opt.Instrumenter.Observe(ctx, InstrumentationCacheStart)
 
 	if opt.Type == RedisCache {
 		con, err := newRedisClient(opt.ConnectionString, opt.ConnectionPassword)
