@@ -24,11 +24,11 @@ func NewEnvironment(defaultMode Environment) Environment {
 		env = defaultMode
 	}
 
-	if env == EnvironmentProduction || env == EnvironmentStaging {
+	if env == EnvironmentProduction || env == EnvironmentStaging || env == EnvironmentDevelopment {
 		return env
 	}
 
-	return EnvironmentDevelopment
+	return defaultMode
 }
 
 // IsProduction checks if current environment is production.

@@ -24,10 +24,16 @@ func CreateDevTLSCertificate(dns ...string) ([]byte, any, error) {
 		return nil, nil, err
 	}
 
+	var max *big.Int = big.NewInt(0).Exp(big.NewInt(2), big.NewInt(130), nil)
+	serial, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	template := x509.Certificate{
-		SerialNumber: big.NewInt(1),
+		SerialNumber: serial,
 		Subject: pkix.Name{
-			Organization: []string{"Azugo DevProxy"},
+			Organization: []string{"Azugo Development"},
 		},
 		NotBefore: time.Now(),
 		// Valid for 5 years
