@@ -16,9 +16,9 @@ import (
 	"time"
 )
 
-// CreateDevTLSCertificate creates a self-signed certificate for development.
+// CreateDevPEM creates a self-signed certificate for development.
 // Returns certificate DER bytes and private key.
-func CreateDevTLSCertificate(dns ...string) ([]byte, any, error) {
+func CreateDevPEM(dns ...string) ([]byte, any, error) {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, nil, err
@@ -52,8 +52,8 @@ func CreateDevTLSCertificate(dns ...string) ([]byte, any, error) {
 	return der, priv, nil
 }
 
-// DevTLSCertificate loads or generates new TLS certificate for development.
-func DevTLSCertificate(name string, dns ...string) ([]byte, []byte, error) {
+// DevPEMFile loads or generates new TLS certificate for development.
+func DevPEMFile(name string, dns ...string) ([]byte, []byte, error) {
 	dataDir, err := os.UserConfigDir()
 	if err != nil {
 		return nil, nil, err
@@ -61,7 +61,7 @@ func DevTLSCertificate(name string, dns ...string) ([]byte, []byte, error) {
 	path := filepath.Join(dataDir, name+".pem")
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		der, priv, err := CreateDevTLSCertificate(dns...)
+		der, priv, err := CreateDevPEM(dns...)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -81,5 +81,5 @@ func DevTLSCertificate(name string, dns ...string) ([]byte, []byte, error) {
 		return cert, key, nil
 	}
 
-	return LoadTLSCertificate(path)
+	return LoadPEMFromFile(path)
 }
