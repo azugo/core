@@ -8,17 +8,15 @@ import (
 	"os"
 	"strings"
 
+	"azugo.io/core/system"
+
 	"github.com/mattn/go-colorable"
 	"go.elastic.co/ecszap"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-var canColorStdout = false
-
-func (a *App) loggerFields() []zap.Field {
-	// TODO: add additional fields for logger
-
+func (a *App) loggerFields(info *system.Info) []zap.Field {
 	fields := make([]zap.Field, 0, 3)
 	if a.AppName != "" {
 		fields = append(fields, zap.String("service.name", a.AppName))
@@ -28,6 +26,31 @@ func (a *App) loggerFields() []zap.Field {
 	}
 	fields = append(fields, zap.String("service.environment", strings.ToLower(string(a.Env()))))
 
+	if info != nil {
+		if info.Hostname != "" {
+			fields = append(fields, zap.String("host.hostname", info.Hostname))
+		}
+		if info.IsContainer() {
+			if info.Container.ID != "" {
+				fields = append(fields, zap.String("container.id", info.Container.ID))
+			}
+			if info.IsKubernetes() {
+				if info.Container.Kubernetes.Namespace != "" {
+					fields = append(fields, zap.String("kubernetes.namespace", info.Container.Kubernetes.Namespace))
+				}
+				if info.Container.Kubernetes.PodName != "" {
+					fields = append(fields, zap.String("kubernetes.pod.name", info.Container.Kubernetes.PodName))
+				}
+				if info.Container.Kubernetes.PodUID != "" {
+					fields = append(fields, zap.String("kubernetes.pod.uid", info.Container.Kubernetes.PodUID))
+				}
+				if info.Container.Kubernetes.NodeName != "" {
+					fields = append(fields, zap.String("kubernetes.node.name", info.Container.Kubernetes.NodeName))
+				}
+			}
+		}
+	}
+
 	return fields
 }
 
@@ -36,7 +59,9 @@ func (a *App) initLogger() error {
 		return nil
 	}
 
-	if canColorStdout && a.Env().IsDevelopment() {
+	info := system.CollectInfo()
+
+	if a.Env().IsDevelopment() && !info.IsContainer() {
 		conf := zap.NewDevelopmentEncoderConfig()
 		conf.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
@@ -48,7 +73,7 @@ func (a *App) initLogger() error {
 			),
 			zap.AddCaller(),
 			zap.AddStacktrace(zap.ErrorLevel),
-		).With(a.loggerFields()...)
+		).With(a.loggerFields(info)...)
 
 		return nil
 	}
@@ -56,7 +81,7 @@ func (a *App) initLogger() error {
 	encoderConfig := ecszap.NewDefaultEncoderConfig()
 	core := ecszap.NewCore(encoderConfig, os.Stdout, zap.InfoLevel)
 
-	a.logger = zap.New(core, zap.AddCaller()).With(a.loggerFields()...)
+	a.logger = zap.New(core, zap.AddCaller()).With(a.loggerFields(info)...)
 
 	return nil
 }
@@ -65,7 +90,7 @@ func (a *App) initLogger() error {
 //
 // Default fields are automatically added to the logger.
 func (a *App) ReplaceLogger(logger *zap.Logger) error {
-	a.logger = logger.With(a.loggerFields()...)
+	a.logger = logger.With(a.loggerFields(system.CollectInfo())...)
 	return a.initLogger()
 }
 
