@@ -106,20 +106,9 @@ func (a *App) Log() *zap.Logger {
 }
 
 func parseLogLevel(level string, defaultLevel zapcore.Level) zapcore.Level {
-	switch level {
-	case "debug", "dbg":
-		return zap.DebugLevel
-	case "info", "inf":
-		return zap.InfoLevel
-	case "warning", "warn":
-		return zap.WarnLevel
-	case "error", "err":
-		return zap.ErrorLevel
-	case "fatal":
-		return zap.FatalLevel
-	case "panic":
-		return zap.PanicLevel
-	default:
+	l, err := zapcore.ParseLevel(level)
+	if err != nil {
 		return defaultLevel
 	}
+	return l
 }

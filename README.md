@@ -12,4 +12,4 @@ Azugo framework core.
 ## Special Environment variables used by the Azugo framework
 
 * `ENVIRONMENT` - An App environment setting (allowed values are `Development`, `Staging` and `Production`).
-* `LOG_LEVEL` - Minimal log level (defaults to `info`, allowed values are `debug`, `info`, `warning`, `error`, `fatal`, `panic`).
+* `LOG_LEVEL` - Minimal log level (defaults to `info`, allowed values are `debug`, `info`, `warn`, `error`, `fatal`, `panic`).
