@@ -69,7 +69,7 @@ func (a *App) initLogger() error {
 			zapcore.NewCore(
 				zapcore.NewConsoleEncoder(conf),
 				zapcore.AddSync(colorable.NewColorableStdout()),
-				zap.DebugLevel,
+				parseLogLevel(os.Getenv("LOG_LEVEL"), zap.DebugLevel),
 			),
 			zap.AddCaller(),
 			zap.AddStacktrace(zap.ErrorLevel),
@@ -78,8 +78,11 @@ func (a *App) initLogger() error {
 		return nil
 	}
 
-	encoderConfig := ecszap.NewDefaultEncoderConfig()
-	core := ecszap.NewCore(encoderConfig, os.Stdout, zap.InfoLevel)
+	core := ecszap.NewCore(
+		ecszap.NewDefaultEncoderConfig(),
+		os.Stdout,
+		parseLogLevel(os.Getenv("LOG_LEVEL"), zap.InfoLevel),
+	)
 
 	a.logger = zap.New(core, zap.AddCaller()).With(a.loggerFields(info)...)
 
@@ -102,4 +105,23 @@ func (a *App) Log() *zap.Logger {
 		}
 	}
 	return a.logger
+}
+
+func parseLogLevel(level string, defaultLevel zapcore.Level) zapcore.Level {
+	switch level {
+	case "debug", "dbg":
+		return zap.DebugLevel
+	case "info", "inf":
+		return zap.InfoLevel
+	case "warning", "warn":
+		return zap.WarnLevel
+	case "error", "err":
+		return zap.ErrorLevel
+	case "fatal":
+		return zap.FatalLevel
+	case "panic":
+		return zap.PanicLevel
+	default:
+		return defaultLevel
+	}
 }
