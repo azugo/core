@@ -29,7 +29,8 @@ type App struct {
 	validate *validation.Validate
 
 	// Logger
-	logger *zap.Logger
+	loglock sync.Mutex
+	logger  *zap.Logger
 
 	// Configuration
 	config *config.Configuration
@@ -137,9 +138,7 @@ func (a *App) Instrumenter() instrumenter.Instrumenter {
 
 // Start web application.
 func (a *App) Start() error {
-	if err := a.initLogger(); err != nil {
-		return err
-	}
+	a.initLogger()
 	if err := a.initCache(); err != nil {
 		return err
 	}

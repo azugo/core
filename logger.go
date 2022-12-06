@@ -54,9 +54,11 @@ func (a *App) loggerFields(info *system.Info) []zap.Field {
 	return fields
 }
 
-func (a *App) initLogger() error {
+func (a *App) initLogger() {
+	a.loglock.Lock()
+	defer a.loglock.Unlock()
 	if a.logger != nil {
-		return nil
+		return
 	}
 
 	info := system.CollectInfo()
@@ -75,7 +77,7 @@ func (a *App) initLogger() error {
 			zap.AddStacktrace(zap.ErrorLevel),
 		).With(a.loggerFields(info)...)
 
-		return nil
+		return
 	}
 
 	core := ecszap.NewCore(
@@ -85,8 +87,6 @@ func (a *App) initLogger() error {
 	)
 
 	a.logger = zap.New(core, zap.AddCaller()).With(a.loggerFields(info)...)
-
-	return nil
 }
 
 // ReplaceLogger replaces current application logger with custom.
@@ -94,15 +94,13 @@ func (a *App) initLogger() error {
 // Default fields are automatically added to the logger.
 func (a *App) ReplaceLogger(logger *zap.Logger) error {
 	a.logger = logger.With(a.loggerFields(system.CollectInfo())...)
-	return a.initLogger()
+	return nil
 }
 
 // Log returns application logger.
 func (a *App) Log() *zap.Logger {
 	if a.logger == nil {
-		if err := a.initLogger(); err != nil {
-			panic(err)
-		}
+		a.initLogger()
 	}
 	return a.logger
 }
