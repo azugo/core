@@ -89,11 +89,12 @@ func detectContainerV2() (*Container, error) {
 			continue
 		}
 
-		if !strings.HasPrefix(p[3], "/var/lib/docker/containers/") {
+		i := strings.Index(p[3], "/docker/containers/")
+		if i == -1 {
 			continue
 		}
 
-		id, _, _ := strings.Cut(p[3][len("/var/lib/docker/containers/"):], "/")
+		id, _, _ := strings.Cut(p[3][i+len("/docker/containers/"):], "/")
 		if !containerIDRegex.MatchString(id) {
 			continue
 		}
