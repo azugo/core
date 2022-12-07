@@ -36,6 +36,9 @@ var (
 func containerInfo() *Container {
 	containerOnce.Do(func() {
 		container, _ = detectContainer()
+		if container == nil {
+			container, _ = detectContainerV2()
+		}
 	})
 	return container
 }

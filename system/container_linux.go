@@ -71,3 +71,37 @@ func detectContainer() (*Container, error) {
 
 	return nil, nil
 }
+
+func detectContainerV2() (*Container, error) {
+	f, err := os.Open("/proc/self/mountinfo")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer f.Close()
+
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		p := strings.Split(s.Text(), " ")
+		if len(p) < 4 {
+			continue
+		}
+
+		if !strings.HasPrefix(p[3], "/var/lib/docker/containers/") {
+			continue
+		}
+
+		id, _, _ := strings.Cut(p[3][len("/var/lib/docker/containers/"):], "/")
+		if !containerIDRegex.MatchString(id) {
+			continue
+		}
+
+		return &Container{
+			ID: id,
+		}, nil
+	}
+
+	return nil, nil
+}
