@@ -100,7 +100,7 @@ func (a *App) initLogger() error {
 		return err
 	}
 
-	a.logger = logger
+	a.logger = logger.Named("app")
 	fmt.Printf("logger: %#v\n", a.logger)
 	return nil
 }
