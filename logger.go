@@ -97,7 +97,7 @@ func (a *App) initLogger() {
 		parseLogLevel(os.Getenv("LOG_LEVEL"), zap.InfoLevel),
 	)
 
-	a.logger = zap.New(core, zap.AddCaller()).With(a.loggerFields(info)...)
+	a.logger = zap.New(core, zap.AddCaller(), zap.Fields(a.loggerFields(info)...))
 	fmt.Printf("logger: %#v\n", a.logger)
 }
 
