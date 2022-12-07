@@ -19,6 +19,8 @@ import (
 )
 
 type App struct {
+	noCopy noCopy //nolint:unused,structcheck
+
 	env Environment
 
 	// Background context
@@ -138,6 +140,7 @@ func (a *App) Instrumenter() instrumenter.Instrumenter {
 
 // Start web application.
 func (a *App) Start() error {
+	fmt.Println("Starting")
 	a.initLogger()
 	if err := a.initCache(); err != nil {
 		return err

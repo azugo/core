@@ -5,7 +5,9 @@
 package core
 
 import (
+	"fmt"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	"azugo.io/core/system"
@@ -57,13 +59,19 @@ func (a *App) loggerFields(info *system.Info) []zap.Field {
 func (a *App) initLogger() {
 	a.loglock.Lock()
 	defer a.loglock.Unlock()
+
+	fmt.Println("initLogger")
+	debug.PrintStack()
+
 	if a.logger != nil {
+		fmt.Printf("logger: %#v\n", a.logger)
 		return
 	}
 
 	info := system.CollectInfo()
 
 	if a.Env().IsDevelopment() && !info.IsContainer() {
+		fmt.Println("initLogger: development mode")
 		conf := zap.NewDevelopmentEncoderConfig()
 		conf.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
@@ -76,9 +84,12 @@ func (a *App) initLogger() {
 			zap.AddCaller(),
 			zap.AddStacktrace(zap.ErrorLevel),
 		).With(a.loggerFields(info)...)
+		fmt.Printf("logger: %#v\n", a.logger)
 
 		return
 	}
+
+	fmt.Println("initLogger: staging/prod mode")
 
 	core := ecszap.NewCore(
 		ecszap.NewDefaultEncoderConfig(),
@@ -87,13 +98,16 @@ func (a *App) initLogger() {
 	)
 
 	a.logger = zap.New(core, zap.AddCaller()).With(a.loggerFields(info)...)
+	fmt.Printf("logger: %#v\n", a.logger)
 }
 
 // ReplaceLogger replaces current application logger with custom.
 //
 // Default fields are automatically added to the logger.
 func (a *App) ReplaceLogger(logger *zap.Logger) error {
+	fmt.Printf("replace logger: %#v\n", logger)
 	a.logger = logger.With(a.loggerFields(system.CollectInfo())...)
+	fmt.Printf("logger: %#v\n", logger)
 	return nil
 }
 
@@ -102,6 +116,7 @@ func (a *App) Log() *zap.Logger {
 	if a.logger == nil {
 		a.initLogger()
 	}
+	fmt.Printf("logger: %#v\n", a.logger)
 	return a.logger
 }
 
