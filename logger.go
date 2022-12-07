@@ -56,7 +56,7 @@ func (a *App) loggerFields(info *system.Info) []zap.Field {
 	return fields
 }
 
-func (a *App) initLogger() {
+func (a *App) initLogger() error {
 	a.loglock.Lock()
 	defer a.loglock.Unlock()
 
@@ -65,7 +65,7 @@ func (a *App) initLogger() {
 
 	if a.logger != nil {
 		fmt.Printf("logger: %#v\n", a.logger)
-		return
+		return nil
 	}
 
 	info := system.CollectInfo()
@@ -79,26 +79,30 @@ func (a *App) initLogger() {
 			zapcore.NewCore(
 				zapcore.NewConsoleEncoder(conf),
 				zapcore.AddSync(colorable.NewColorableStdout()),
-				parseLogLevel(os.Getenv("LOG_LEVEL"), zap.DebugLevel),
+				zap.NewAtomicLevelAt(parseLogLevel(os.Getenv("LOG_LEVEL"), zap.DebugLevel)),
 			),
 			zap.AddCaller(),
 			zap.AddStacktrace(zap.ErrorLevel),
 		).With(a.loggerFields(info)...)
 		fmt.Printf("logger: %#v\n", a.logger)
 
-		return
+		return nil
 	}
 
 	fmt.Println("initLogger: staging/prod mode")
 
-	core := ecszap.NewCore(
-		ecszap.NewDefaultEncoderConfig(),
-		os.Stdout,
-		parseLogLevel(os.Getenv("LOG_LEVEL"), zap.InfoLevel),
-	)
+	config := zap.NewProductionConfig()
+	config.Level = zap.NewAtomicLevelAt(parseLogLevel(os.Getenv("LOG_LEVEL"), zap.InfoLevel))
+	config.EncoderConfig = ecszap.ECSCompatibleEncoderConfig(config.EncoderConfig)
+	config.DisableCaller = false
+	logger, err := config.Build(ecszap.WrapCoreOption(), zap.Fields(a.loggerFields(info)...))
+	if err != nil {
+		return err
+	}
 
-	a.logger = zap.New(core, zap.AddCaller(), zap.Fields(a.loggerFields(info)...))
+	a.logger = logger
 	fmt.Printf("logger: %#v\n", a.logger)
+	return nil
 }
 
 // ReplaceLogger replaces current application logger with custom.
@@ -114,7 +118,7 @@ func (a *App) ReplaceLogger(logger *zap.Logger) error {
 // Log returns application logger.
 func (a *App) Log() *zap.Logger {
 	if a.logger == nil {
-		a.initLogger()
+		_ = a.initLogger()
 	}
 	fmt.Printf("app: %#v\n", a)
 	fmt.Printf("logger: %#v\n", a.logger)
