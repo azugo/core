@@ -117,6 +117,7 @@ func (a *App) Log() *zap.Logger {
 		a.initLogger()
 	}
 	fmt.Printf("logger core: %#v\n", a.logger.Core())
+	debug.PrintStack()
 	return a.logger
 }
 
