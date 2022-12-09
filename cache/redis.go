@@ -31,16 +31,21 @@ func newRedisCache[T any](prefix string, con *redis.Client, opts ...CacheOption)
 		keyPrefix += ":"
 	}
 
-	return &redisCache[T]{
-		con:    con,
-		prefix: keyPrefix + prefix + ":",
-		ttl:    opt.TTL,
-		loader: func(ctx context.Context, key string) (interface{}, error) {
+	loader := opt.Loader
+	if loader != nil {
+		loader = func(ctx context.Context, key string) (interface{}, error) {
 			finish := opt.Instrumenter.Observe(ctx, InstrumentationCacheLoader, key)
 			v, err := opt.Loader(ctx, key)
 			finish(err)
 			return v, err
-		},
+		}
+	}
+
+	return &redisCache[T]{
+		con:          con,
+		prefix:       keyPrefix + prefix + ":",
+		ttl:          opt.TTL,
+		loader:       loader,
 		instrumenter: opt.Instrumenter,
 	}, nil
 }
