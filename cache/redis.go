@@ -52,50 +52,43 @@ func newRedisCache[T any](prefix string, con *redis.Cmdable, opts ...CacheOption
 	}, nil
 }
 
-type customURLAttr struct {
-	InsecureSkipVerify *bool
-	URL                string
-}
-
-func parseCustomURLAttr(v string) (customURLAttr, error) {
-	u, err := url.Parse(v)
-	if err != nil {
-		return customURLAttr{}, err
-	}
-	attr := customURLAttr{}
-	if u.RawQuery != "" {
-		q := u.Query()
-		if v := q.Get("ssl_cert_reqs"); v != "" {
-			skipVerify := v == "none"
-			attr.InsecureSkipVerify = &skipVerify
-			q.Del("ssl_cert_reqs")
-			u.RawQuery = q.Encode()
-		}
-	}
-	attr.URL = u.String()
-	return attr, nil
+func parseCustomURLAttr(v string) (string, bool, error) {
+    u, err := url.Parse(v)
+    if err != nil {
+        return "", false, err
+    }
+    var insecureSkipVerify bool
+    if u.RawQuery != "" {
+        q := u.Query()
+        if q.Get("skip_verify") == "true" {
+            insecureSkipVerify = true
+            q.Del("skip_verify")
+            u.RawQuery = q.Encode()
+        }
+    }
+    return u.String(), insecureSkipVerify, nil
 }
 
 func ParseRedisClusterURL(v string) (*redis.ClusterOptions, error) {
-	attr, err := parseCustomURLAttr(v)
+	v, insecureSkipVerify , err := parseCustomURLAttr(v)
 	if err != nil {
 		return nil, err
 	}
-	o, err := redis.ParseClusterURL(attr.URL)
-	if err == nil && o.TLSConfig != nil && attr.InsecureSkipVerify != nil {
-		o.TLSConfig.InsecureSkipVerify = *attr.InsecureSkipVerify
+	o, err := redis.ParseClusterURL(v)
+	if err == nil && o.TLSConfig != nil {
+		o.TLSConfig.InsecureSkipVerify = insecureSkipVerify
 	}
 	return o, err
 }
 
 func ParseRedisURL(v string) (*redis.Options, error) {
-	attr, err := parseCustomURLAttr(v)
+	v, insecureSkipVerify , err := parseCustomURLAttr(v)
 	if err != nil {
 		return nil, err
 	}
-	o, err := redis.ParseURL(attr.URL)
-	if err == nil && o.TLSConfig != nil && attr.InsecureSkipVerify != nil {
-		o.TLSConfig.InsecureSkipVerify = *attr.InsecureSkipVerify
+	o, err := redis.ParseURL(v)
+	if err == nil && o.TLSConfig != nil {
+		o.TLSConfig.InsecureSkipVerify = insecureSkipVerify
 	}
 	return o, err
 }
