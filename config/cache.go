@@ -14,7 +14,7 @@ import (
 )
 
 type Cache struct {
-	Type             cache.CacheType `mapstructure:"type" validate:"required,oneof=memory redis"`
+	Type             cache.CacheType `mapstructure:"type" validate:"required,oneof=memory redis redis-cluster"`
 	TTL              time.Duration   `mapstructure:"ttl" validate:"omitempty,min=0"`
 	ConnectionString string          `mapstructure:"connection" validate:"omitempty"`
 	Password         string          `mapstructure:"password" validate:"omitempty"`

@@ -7,6 +7,8 @@ package cache
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"reflect"
 	"time"
 
 	"azugo.io/core/instrumenter"
@@ -16,14 +18,14 @@ import (
 )
 
 type redisCache[T any] struct {
-	con          *redis.Client
+	con          *redis.Cmdable
 	prefix       string
 	ttl          time.Duration
 	loader       func(ctx context.Context, key string) (interface{}, error)
 	instrumenter instrumenter.Instrumenter
 }
 
-func newRedisCache[T any](prefix string, con *redis.Client, opts ...CacheOption) (CacheInstance[T], error) {
+func newRedisCache[T any](prefix string, con *redis.Cmdable, opts ...CacheOption) (CacheInstance[T], error) {
 	opt := newCacheOptions(opts...)
 
 	keyPrefix := opt.KeyPrefix
@@ -50,8 +52,56 @@ func newRedisCache[T any](prefix string, con *redis.Client, opts ...CacheOption)
 	}, nil
 }
 
-func newRedisClient(constr, password string) (*redis.Client, error) {
-	redisOptions, err := redis.ParseURL(constr)
+type customURLAttr struct {
+	InsecureSkipVerify *bool
+	URL                string
+}
+
+func parseCustomURLAttr(v string) (customURLAttr, error) {
+	u, err := url.Parse(v)
+	if err != nil {
+		return customURLAttr{}, err
+	}
+	attr := customURLAttr{}
+	if u.RawQuery != "" {
+		q := u.Query()
+		if v := q.Get("ssl_cert_reqs"); v != "" {
+			skipVerify := v == "none"
+			attr.InsecureSkipVerify = &skipVerify
+			q.Del("ssl_cert_reqs")
+			u.RawQuery = q.Encode()
+		}
+	}
+	attr.URL = u.String()
+	return attr, nil
+}
+
+func ParseRedisClusterURL(v string) (*redis.ClusterOptions, error) {
+	attr, err := parseCustomURLAttr(v)
+	if err != nil {
+		return nil, err
+	}
+	o, err := redis.ParseClusterURL(attr.URL)
+	if err == nil && o.TLSConfig != nil && attr.InsecureSkipVerify != nil {
+		o.TLSConfig.InsecureSkipVerify = *attr.InsecureSkipVerify
+	}
+	return o, err
+}
+
+func ParseRedisURL(v string) (*redis.Options, error) {
+	attr, err := parseCustomURLAttr(v)
+	if err != nil {
+		return nil, err
+	}
+	o, err := redis.ParseURL(attr.URL)
+	if err == nil && o.TLSConfig != nil && attr.InsecureSkipVerify != nil {
+		o.TLSConfig.InsecureSkipVerify = *attr.InsecureSkipVerify
+	}
+	return o, err
+}
+
+func newRedisClient(constr, password string) (redis.Cmdable, error) {
+	redisOptions, err := ParseRedisURL(constr)
 	if err != nil {
 		return nil, err
 	}
@@ -63,15 +113,25 @@ func newRedisClient(constr, password string) (*redis.Client, error) {
 	return redis.NewClient(redisOptions), nil
 }
 
+func newRedisClusterClient(constr, password string) (redis.Cmdable, error) {
+	redisOptions, err := ParseRedisClusterURL(constr)
+	if err != nil {
+		return nil, err
+	}
+	// If password is provided override provided in connection string.
+	if len(password) != 0 {
+		redisOptions.Password = password
+	}
+	return redis.NewClusterClient(redisOptions), nil
+}
+
 func (c *redisCache[T]) Get(ctx context.Context, key string, opts ...ItemOption[T]) (T, error) {
 	val := new(T)
 	if c.con == nil {
 		return *val, ErrCacheClosed
 	}
-
 	finish := c.instrumenter.Observe(ctx, InstrumentationCacheGet, c.prefix+key)
-
-	s := c.con.Get(ctx, c.prefix+key)
+	s := (*c.con).Get(ctx, c.prefix+key)
 	if s.Err() == redis.Nil {
 		if c.loader != nil {
 			v, err := c.loader(ctx, key)
@@ -115,7 +175,7 @@ func (c *redisCache[T]) Pop(ctx context.Context, key string) (T, error) {
 	finishG := c.instrumenter.Observe(ctx, InstrumentationCacheGet, c.prefix+key)
 	finishD := c.instrumenter.Observe(ctx, InstrumentationCacheDelete, c.prefix+key)
 
-	s := c.con.GetDel(ctx, c.prefix+key)
+	s := (*c.con).GetDel(ctx, c.prefix+key)
 	if s.Err() == redis.Nil {
 		finishD(nil)
 		finishG(nil)
@@ -141,7 +201,6 @@ func (c *redisCache[T]) Set(ctx context.Context, key string, value T, opts ...It
 	if c.con == nil {
 		return ErrCacheClosed
 	}
-
 	finish := c.instrumenter.Observe(ctx, InstrumentationCacheSet, c.prefix+key)
 
 	buf, err := json.Marshal(value)
@@ -155,7 +214,7 @@ func (c *redisCache[T]) Set(ctx context.Context, key string, value T, opts ...It
 	if opt.TTL != 0 {
 		ttl = opt.TTL
 	}
-	s := c.con.Set(ctx, c.prefix+key, string(buf), ttl)
+	s := (*c.con).Set(ctx, c.prefix+key, string(buf), ttl)
 	if s.Err() != nil {
 		finish(s.Err())
 		return s.Err()
@@ -171,7 +230,7 @@ func (c *redisCache[T]) Delete(ctx context.Context, key string) error {
 
 	finish := c.instrumenter.Observe(ctx, InstrumentationCacheSet, c.prefix+key)
 
-	s := c.con.Del(ctx, c.prefix+key)
+	s := (*c.con).Del(ctx, c.prefix+key)
 	if s.Err() != nil {
 		finish(s.Err())
 		return s.Err()
@@ -184,17 +243,29 @@ func (c *redisCache[T]) Ping(ctx context.Context) error {
 	if c.con == nil {
 		return nil
 	}
-	s := c.con.Ping(ctx)
+	s := (*c.con).Ping(ctx)
 	if s.Err() != nil {
 		return s.Err()
 	}
 	return nil
 }
 
-func (c *redisCache[T]) Close() {
+func (c *redisCache[T]) Close() error {
 	if c.con == nil {
-		return
+		return nil
 	}
-	_ = c.con.Close()
+	var err error
+	switch v := (*c.con).(type) {
+	case *redis.Client:
+		err = v.Close()
+	case *redis.ClusterClient:
+		err = v.Close()
+	case nil:
+		// do nothing
+	default:
+		// this will not happen anyway, unless we mishandle it on `Init`
+		panic(fmt.Sprintf("invalid redis client: %v", reflect.TypeOf(v)))
+	}
 	c.con = nil
+	return err
 }
