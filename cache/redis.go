@@ -6,7 +6,10 @@ package cache
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"net/url"
+	"reflect"
 	"time"
 
 	"azugo.io/core/instrumenter"
@@ -16,14 +19,14 @@ import (
 )
 
 type redisCache[T any] struct {
-	con          *redis.Client
+	con          redis.Cmdable
 	prefix       string
 	ttl          time.Duration
 	loader       func(ctx context.Context, key string) (interface{}, error)
 	instrumenter instrumenter.Instrumenter
 }
 
-func newRedisCache[T any](prefix string, con *redis.Client, opts ...CacheOption) (CacheInstance[T], error) {
+func newRedisCache[T any](prefix string, con redis.Cmdable, opts ...CacheOption) (CacheInstance[T], error) {
 	opt := newCacheOptions(opts...)
 
 	keyPrefix := opt.KeyPrefix
@@ -50,8 +53,55 @@ func newRedisCache[T any](prefix string, con *redis.Client, opts ...CacheOption)
 	}, nil
 }
 
-func newRedisClient(constr, password string) (*redis.Client, error) {
-	redisOptions, err := redis.ParseURL(constr)
+func parseCustomURLAttr(v string) (string, bool, error) {
+	u, err := url.Parse(v)
+	if err != nil {
+		return "", false, err
+	}
+	var insecureSkipVerify bool
+	if u.RawQuery != "" {
+		q := u.Query()
+		if q.Get("skip_verify") == "true" {
+			insecureSkipVerify = true
+			q.Del("skip_verify")
+			u.RawQuery = q.Encode()
+		}
+	}
+	return u.String(), insecureSkipVerify, nil
+}
+
+func ParseRedisClusterURL(v string) (*redis.ClusterOptions, error) {
+	v, insecureSkipVerify, err := parseCustomURLAttr(v)
+	if err != nil {
+		return nil, err
+	}
+	o, err := redis.ParseClusterURL(v)
+	if err == nil && insecureSkipVerify {
+		if o.TLSConfig == nil {
+			o.TLSConfig = &tls.Config{}
+		}
+		o.TLSConfig.InsecureSkipVerify = insecureSkipVerify
+	}
+	return o, err
+}
+
+func ParseRedisURL(v string) (*redis.Options, error) {
+	v, insecureSkipVerify, err := parseCustomURLAttr(v)
+	if err != nil {
+		return nil, err
+	}
+	o, err := redis.ParseURL(v)
+	if err == nil && insecureSkipVerify {
+		if o.TLSConfig == nil {
+			o.TLSConfig = &tls.Config{}
+		}
+		o.TLSConfig.InsecureSkipVerify = insecureSkipVerify
+	}
+	return o, err
+}
+
+func newRedisClient(constr, password string) (redis.Cmdable, error) {
+	redisOptions, err := ParseRedisURL(constr)
 	if err != nil {
 		return nil, err
 	}
@@ -63,14 +113,24 @@ func newRedisClient(constr, password string) (*redis.Client, error) {
 	return redis.NewClient(redisOptions), nil
 }
 
+func newRedisClusterClient(constr, password string) (redis.Cmdable, error) {
+	redisOptions, err := ParseRedisClusterURL(constr)
+	if err != nil {
+		return nil, err
+	}
+	// If password is provided override provided in connection string.
+	if len(password) != 0 {
+		redisOptions.Password = password
+	}
+	return redis.NewClusterClient(redisOptions), nil
+}
+
 func (c *redisCache[T]) Get(ctx context.Context, key string, opts ...ItemOption[T]) (T, error) {
 	val := new(T)
 	if c.con == nil {
 		return *val, ErrCacheClosed
 	}
-
 	finish := c.instrumenter.Observe(ctx, InstrumentationCacheGet, c.prefix+key)
-
 	s := c.con.Get(ctx, c.prefix+key)
 	if s.Err() == redis.Nil {
 		if c.loader != nil {
@@ -141,7 +201,6 @@ func (c *redisCache[T]) Set(ctx context.Context, key string, value T, opts ...It
 	if c.con == nil {
 		return ErrCacheClosed
 	}
-
 	finish := c.instrumenter.Observe(ctx, InstrumentationCacheSet, c.prefix+key)
 
 	buf, err := json.Marshal(value)
@@ -191,10 +250,22 @@ func (c *redisCache[T]) Ping(ctx context.Context) error {
 	return nil
 }
 
-func (c *redisCache[T]) Close() {
+func (c *redisCache[T]) Close() error {
 	if c.con == nil {
-		return
+		return nil
 	}
-	_ = c.con.Close()
+	var err error
+	switch v := c.con.(type) {
+	case *redis.Client:
+		err = v.Close()
+	case *redis.ClusterClient:
+		err = v.Close()
+	case nil:
+		// do nothing
+	default:
+		// this will not happen anyway, unless we mishandle it on `Init`
+		panic(fmt.Sprintf("invalid redis client: %v", reflect.TypeOf(v)))
+	}
 	c.con = nil
+	return err
 }

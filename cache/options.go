@@ -60,6 +60,8 @@ const (
 	MemoryCache CacheType = "memory"
 	// RedisCache store data in Redis database.
 	RedisCache CacheType = "redis"
+	// RedisClusterCache store data in Redis database cluster.
+	RedisClusterCache CacheType = "redis-cluster"
 )
 
 func (t CacheType) applyCache(c *cacheOptions) {
