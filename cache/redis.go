@@ -54,20 +54,20 @@ func newRedisCache[T any](prefix string, con redis.Cmdable, opts ...CacheOption)
 }
 
 func parseCustomURLAttr(v string) (string, bool, error) {
-    u, err := url.Parse(v)
-    if err != nil {
-        return "", false, err
-    }
-    var insecureSkipVerify bool
-    if u.RawQuery != "" {
-        q := u.Query()
-        if q.Get("skip_verify") == "true" {
-            insecureSkipVerify = true
-            q.Del("skip_verify")
-            u.RawQuery = q.Encode()
-        }
-    }
-    return u.String(), insecureSkipVerify, nil
+	u, err := url.Parse(v)
+	if err != nil {
+		return "", false, err
+	}
+	var insecureSkipVerify bool
+	if u.RawQuery != "" {
+		q := u.Query()
+		if q.Get("skip_verify") == "true" {
+			insecureSkipVerify = true
+			q.Del("skip_verify")
+			u.RawQuery = q.Encode()
+		}
+	}
+	return u.String(), insecureSkipVerify, nil
 }
 
 func ParseRedisClusterURL(v string) (*redis.ClusterOptions, error) {
@@ -78,7 +78,7 @@ func ParseRedisClusterURL(v string) (*redis.ClusterOptions, error) {
 	o, err := redis.ParseClusterURL(v)
 	if err == nil && insecureSkipVerify {
 		if o.TLSConfig == nil {
-				o.TLSConfig = &tls.Config{}
+			o.TLSConfig = &tls.Config{}
 		}
 		o.TLSConfig.InsecureSkipVerify = insecureSkipVerify
 	}
@@ -86,14 +86,14 @@ func ParseRedisClusterURL(v string) (*redis.ClusterOptions, error) {
 }
 
 func ParseRedisURL(v string) (*redis.Options, error) {
-	v, insecureSkipVerify , err := parseCustomURLAttr(v)
+	v, insecureSkipVerify, err := parseCustomURLAttr(v)
 	if err != nil {
 		return nil, err
 	}
 	o, err := redis.ParseURL(v)
 	if err == nil && insecureSkipVerify {
 		if o.TLSConfig == nil {
-				o.TLSConfig = &tls.Config{}
+			o.TLSConfig = &tls.Config{}
 		}
 		o.TLSConfig.InsecureSkipVerify = insecureSkipVerify
 	}
