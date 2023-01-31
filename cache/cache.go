@@ -182,7 +182,7 @@ func Create[T any](cache *Cache, name string, opts ...CacheOption) (CacheInstanc
 				return nil, err
 			}
 		}
-		c, err = newRedisCache[T](name, &con, opt...)
+		c, err = newRedisCache[T](name, con, opt...)
 		if err != nil {
 			return nil, err
 		}
@@ -194,7 +194,7 @@ func Create[T any](cache *Cache, name string, opts ...CacheOption) (CacheInstanc
 				return nil, err
 			}
 		}
-		c, err = newRedisCache[T](name, &con, opt...)
+		c, err = newRedisCache[T](name, con, opt...)
 		if err != nil {
 			return nil, err
 		}
