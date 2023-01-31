@@ -19,14 +19,14 @@ import (
 )
 
 type redisCache[T any] struct {
-	con          *redis.Cmdable
+	con          redis.Cmdable
 	prefix       string
 	ttl          time.Duration
 	loader       func(ctx context.Context, key string) (interface{}, error)
 	instrumenter instrumenter.Instrumenter
 }
 
-func newRedisCache[T any](prefix string, con *redis.Cmdable, opts ...CacheOption) (CacheInstance[T], error) {
+func newRedisCache[T any](prefix string, con redis.Cmdable, opts ...CacheOption) (CacheInstance[T], error) {
 	opt := newCacheOptions(opts...)
 
 	keyPrefix := opt.KeyPrefix
@@ -131,7 +131,7 @@ func (c *redisCache[T]) Get(ctx context.Context, key string, opts ...ItemOption[
 		return *val, ErrCacheClosed
 	}
 	finish := c.instrumenter.Observe(ctx, InstrumentationCacheGet, c.prefix+key)
-	s := (*c.con).Get(ctx, c.prefix+key)
+	s := c.con.Get(ctx, c.prefix+key)
 	if s.Err() == redis.Nil {
 		if c.loader != nil {
 			v, err := c.loader(ctx, key)
@@ -175,7 +175,7 @@ func (c *redisCache[T]) Pop(ctx context.Context, key string) (T, error) {
 	finishG := c.instrumenter.Observe(ctx, InstrumentationCacheGet, c.prefix+key)
 	finishD := c.instrumenter.Observe(ctx, InstrumentationCacheDelete, c.prefix+key)
 
-	s := (*c.con).GetDel(ctx, c.prefix+key)
+	s := c.con.GetDel(ctx, c.prefix+key)
 	if s.Err() == redis.Nil {
 		finishD(nil)
 		finishG(nil)
@@ -214,7 +214,7 @@ func (c *redisCache[T]) Set(ctx context.Context, key string, value T, opts ...It
 	if opt.TTL != 0 {
 		ttl = opt.TTL
 	}
-	s := (*c.con).Set(ctx, c.prefix+key, string(buf), ttl)
+	s := c.con.Set(ctx, c.prefix+key, string(buf), ttl)
 	if s.Err() != nil {
 		finish(s.Err())
 		return s.Err()
@@ -230,7 +230,7 @@ func (c *redisCache[T]) Delete(ctx context.Context, key string) error {
 
 	finish := c.instrumenter.Observe(ctx, InstrumentationCacheSet, c.prefix+key)
 
-	s := (*c.con).Del(ctx, c.prefix+key)
+	s := c.con.Del(ctx, c.prefix+key)
 	if s.Err() != nil {
 		finish(s.Err())
 		return s.Err()
@@ -243,7 +243,7 @@ func (c *redisCache[T]) Ping(ctx context.Context) error {
 	if c.con == nil {
 		return nil
 	}
-	s := (*c.con).Ping(ctx)
+	s := c.con.Ping(ctx)
 	if s.Err() != nil {
 		return s.Err()
 	}
@@ -255,7 +255,7 @@ func (c *redisCache[T]) Close() error {
 		return nil
 	}
 	var err error
-	switch v := (*c.con).(type) {
+	switch v := c.con.(type) {
 	case *redis.Client:
 		err = v.Close()
 	case *redis.ClusterClient:
