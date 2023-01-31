@@ -36,7 +36,7 @@ func (e ErrKeyNotFound) Error() string {
 type Cache struct {
 	options     []CacheOption
 	cache       map[string]any
-	redisCon    *redis.Cmdable
+	redisCon    redis.Cmdable
 	redisConStr string
 }
 
@@ -90,7 +90,7 @@ func (c *Cache) Start(ctx context.Context) error {
 			finish(err)
 			return err
 		}
-		c.redisCon = &con
+		c.redisCon = con
 		c.redisConStr = opt.ConnectionString
 	}
 	finish(nil)
@@ -105,12 +105,12 @@ func (c *Cache) Close() {
 	defer finish(nil)
 
 	if opt.Type == RedisCache {
-		v := (*c.redisCon).(*redis.Client)
+		v := c.redisCon.(*redis.Client)
 		_ = v.Close()
 		c.redisCon = nil
 	}
 	if opt.Type == RedisClusterCache {
-		v := (*c.redisCon).(*redis.ClusterClient)
+		v := c.redisCon.(*redis.ClusterClient)
 		_ = v.Close()
 		c.redisCon = nil
 	}
@@ -129,7 +129,7 @@ func (c *Cache) Ping(ctx context.Context) error {
 	finish := opt.Instrumenter.Observe(ctx, InstrumentationCachePing)
 
 	if (opt.Type == RedisCache || opt.Type == RedisClusterCache) && c.redisCon != nil {
-		if s := (*c.redisCon).Ping(ctx); s != nil && s.Err() != nil {
+		if s := c.redisCon.Ping(ctx); s != nil && s.Err() != nil {
 			finish(s.Err())
 			return s.Err()
 		}
@@ -177,24 +177,24 @@ func Create[T any](cache *Cache, name string, opts ...CacheOption) (CacheInstanc
 	case RedisCache:
 		con := cache.redisCon
 		if o.ConnectionString != cache.redisConStr {
-			*con, err = newRedisClient(o.ConnectionString, o.ConnectionPassword)
+			con, err = newRedisClient(o.ConnectionString, o.ConnectionPassword)
 			if err != nil {
 				return nil, err
 			}
 		}
-		c, err = newRedisCache[T](name, con, opt...)
+		c, err = newRedisCache[T](name, &con, opt...)
 		if err != nil {
 			return nil, err
 		}
 	case RedisClusterCache:
 		con := cache.redisCon
 		if o.ConnectionString != cache.redisConStr {
-			*con, err = newRedisClusterClient(o.ConnectionString, o.ConnectionPassword)
+			con, err = newRedisClusterClient(o.ConnectionString, o.ConnectionPassword)
 			if err != nil {
 				return nil, err
 			}
 		}
-		c, err = newRedisCache[T](name, con, opt...)
+		c, err = newRedisCache[T](name, &con, opt...)
 		if err != nil {
 			return nil, err
 		}

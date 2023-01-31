@@ -6,6 +6,7 @@ package cache
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/url"
 	"reflect"
@@ -75,7 +76,10 @@ func ParseRedisClusterURL(v string) (*redis.ClusterOptions, error) {
 		return nil, err
 	}
 	o, err := redis.ParseClusterURL(v)
-	if err == nil && o.TLSConfig != nil {
+	if err == nil && insecureSkipVerify {
+		if o.TLSConfig == nil {
+				o.TLSConfig = &tls.Config{}
+		}
 		o.TLSConfig.InsecureSkipVerify = insecureSkipVerify
 	}
 	return o, err
@@ -87,7 +91,10 @@ func ParseRedisURL(v string) (*redis.Options, error) {
 		return nil, err
 	}
 	o, err := redis.ParseURL(v)
-	if err == nil && o.TLSConfig != nil {
+	if err == nil && insecureSkipVerify {
+		if o.TLSConfig == nil {
+				o.TLSConfig = &tls.Config{}
+		}
 		o.TLSConfig.InsecureSkipVerify = insecureSkipVerify
 	}
 	return o, err
