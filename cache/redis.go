@@ -70,7 +70,7 @@ func parseCustomURLAttr(v string) (string, bool, error) {
 }
 
 func ParseRedisClusterURL(v string) (*redis.ClusterOptions, error) {
-	v, insecureSkipVerify , err := parseCustomURLAttr(v)
+	v, insecureSkipVerify, err := parseCustomURLAttr(v)
 	if err != nil {
 		return nil, err
 	}
