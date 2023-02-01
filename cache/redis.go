@@ -14,8 +14,8 @@ import (
 
 	"azugo.io/core/instrumenter"
 
-	"github.com/go-redis/redis/v9"
 	"github.com/goccy/go-json"
+	"github.com/redis/go-redis/v9"
 )
 
 type redisCache[T any] struct {
