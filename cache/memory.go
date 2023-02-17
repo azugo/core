@@ -8,22 +8,32 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"azugo.io/core/instrumenter"
 
-	"github.com/lafriks/ttlcache/v3"
+	"github.com/dgraph-io/ristretto"
 )
 
 type memoryCache[T any] struct {
-	cache        *ttlcache.Cache[string, T]
+	cache        *ristretto.Cache
+	ttl          time.Duration
 	lock         sync.Mutex
 	loader       func(ctx context.Context, key string) (interface{}, error)
 	instrumenter instrumenter.Instrumenter
 }
 
+
 func newMemoryCache[T any](opts ...CacheOption) (CacheInstance[T], error) {
 	opt := newCacheOptions(opts...)
-	c := ttlcache.New(ttlcache.WithTTL[string, T](opt.TTL))
+	c, err := ristretto.NewCache(&ristretto.Config{
+		NumCounters: 1000, // number of keys to track frequency of (10k).
+		MaxCost:     1 << 20, // maximum cost of cache (1GB).
+		BufferItems: 64, // number of keys per Get buffer.
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	loader := opt.Loader
 	if loader != nil {
@@ -37,19 +47,14 @@ func newMemoryCache[T any](opts ...CacheOption) (CacheInstance[T], error) {
 
 	return &memoryCache[T]{
 		cache:        c,
+		ttl:          opt.TTL,
 		loader:       loader,
 		instrumenter: opt.Instrumenter,
 	}, nil
 }
 
-func (c *memoryCache[T]) getLoader(ctx context.Context, opts ...ItemOption[T]) ttlcache.LoaderFunc[string, T] {
-	return func(cache *ttlcache.Cache[string, T], key string) (*ttlcache.Item[string, T], error) {
-		opt := newItemOptions(opts...)
-		ttl := opt.TTL
-		if ttl == 0 {
-			ttl = ttlcache.DefaultTTL
-		}
-
+func (c *memoryCache[T]) getLoader(ctx context.Context, opts ...ItemOption[T]) func(string) (interface{}, error) {
+	return func(key string) (interface{}, error) {
 		v, err := c.loader(ctx, key)
 		if err != nil {
 			return nil, err
@@ -58,7 +63,7 @@ func (c *memoryCache[T]) getLoader(ctx context.Context, opts ...ItemOption[T]) t
 		if !ok {
 			return nil, fmt.Errorf("invalid value from loader: %v", v)
 		}
-		return cache.Set(key, vv, ttl), nil
+		return vv, nil
 	}
 }
 
@@ -68,25 +73,40 @@ func (c *memoryCache[T]) Get(ctx context.Context, key string, opts ...ItemOption
 		return val, ErrCacheClosed
 	}
 
-	cacheOpts := make([]ttlcache.Option[string, T], 0)
-
-	if c.loader != nil {
-		cacheOpts = append(cacheOpts, ttlcache.WithLoader[string, T](c.getLoader(ctx, opts...)))
-	}
-
 	finish := c.instrumenter.Observe(ctx, InstrumentationCacheGet, key)
 
-	i, err := c.cache.Get(key, cacheOpts...)
-	if err != nil || i == nil {
-		finish(err)
-		return val, err
+	var value interface{}
+	var found bool
+	if c.loader != nil {
+		value, found = c.getWithLoader(key, c.getLoader(ctx, opts...))
+	} else {
+		value, found = c.cache.Get(key)
 	}
-	if i.IsExpired() {
-		finish(nil)
-		return val, nil
+	if !found {
+		finish(ErrKeyNotFound{Key: key})
+		return val, ErrKeyNotFound{Key: key}
 	}
 	finish(nil)
-	return i.Value(), nil
+	return value.(T), nil
+}
+
+func (c *memoryCache[T]) getWithLoader(key string, loader func(string) (interface{}, error)) (interface{}, bool) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	i, exists := c.cache.Get(key)
+	if exists {
+		return i, true
+	}
+	if i == nil {
+		v, err := loader(key)
+		if err != nil {
+			return nil, false
+		}
+		_ = c.cache.SetWithTTL(key, v, 1, c.ttl)
+		return v, true
+	}
+	return i, true
 }
 
 func (c *memoryCache[T]) Pop(ctx context.Context, key string) (T, error) {
@@ -100,34 +120,25 @@ func (c *memoryCache[T]) Pop(ctx context.Context, key string) (T, error) {
 
 	finish := c.instrumenter.Observe(ctx, InstrumentationCacheGet, key)
 
-	i, err := c.cache.Get(key)
-	if err != nil {
-		finish(err)
-		return val, err
-	}
-	if i == nil || i.IsExpired() {
+	i, exists := c.cache.Get(key)
+	if !exists {
 		finish(nil)
 		return val, ErrKeyNotFound{Key: key}
 	}
-	c.cache.Delete(key)
+	c.cache.Del(key)
 	finish(nil)
-	return i.Value(), nil
+	return i.(T), nil
 }
 
 func (c *memoryCache[T]) Set(ctx context.Context, key string, value T, opts ...ItemOption[T]) error {
 	if c.cache == nil {
 		return ErrCacheClosed
 	}
-	opt := newItemOptions(opts...)
-	ttl := opt.TTL
-	if ttl == 0 {
-		ttl = ttlcache.DefaultTTL
-	}
 
 	finish := c.instrumenter.Observe(ctx, InstrumentationCacheSet, key)
 	defer finish(nil)
 
-	_ = c.cache.Set(key, value, ttl)
+	_ = c.cache.SetWithTTL(key, value, 1, c.ttl)
 	return nil
 }
 
@@ -139,7 +150,7 @@ func (c *memoryCache[T]) Delete(ctx context.Context, key string) error {
 	finish := c.instrumenter.Observe(ctx, InstrumentationCacheDelete, key)
 	defer finish(nil)
 
-	c.cache.Delete(key)
+	c.cache.Del(key)
 	return nil
 }
 
@@ -147,6 +158,6 @@ func (c *memoryCache[T]) Close() {
 	if c.cache == nil {
 		return
 	}
-	c.cache.DeleteAll()
+	c.cache.Clear()
 	c.cache = nil
 }
