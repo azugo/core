@@ -136,15 +136,11 @@ func (c *memoryCache[T]) Pop(ctx context.Context, key string) (T, error) {
 }
 
 func (c *memoryCache[T]) Set(ctx context.Context, key string, value T, opts ...ItemOption[T]) error {
-	if c.cache == nil {
-		return ErrCacheClosed
-	}
 	opt := newItemOptions(opts...)
 	ttl := opt.TTL
 	if ttl == 0 {
 		ttl = c.ttl
 	}
-
 	finish := c.instrumenter.Observe(ctx, InstrumentationCacheSet, key)
 	defer finish(nil)
 
