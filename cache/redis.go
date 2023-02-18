@@ -109,7 +109,8 @@ func newRedisClient(constr, password string) (redis.Cmdable, error) {
 	if len(password) != 0 {
 		redisOptions.Password = password
 	}
-
+	// longer timeout for redis client to avoid timeout errors for slow redis servers
+	redisOptions.DialTimeout = 10 * time.Second
 	return redis.NewClient(redisOptions), nil
 }
 
