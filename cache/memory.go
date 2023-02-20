@@ -95,6 +95,13 @@ func (c *memoryCache[T]) set(key string, v interface{}, ttl time.Duration) error
 	if c.cache == nil {
 		return ErrCacheClosed
 	}
+	if ttl == 0 {
+		success := c.cache.Set(key, v, 1)
+		if !success {
+			return ErrCacheClosed
+		}
+		return nil
+	}
 	success := c.cache.SetWithTTL(key, v, 1, ttl)
 	if !success {
 		return ErrCacheClosed
