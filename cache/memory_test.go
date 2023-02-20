@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 func TestMemoryCacheGetSet(t *testing.T) {
 	c := New(CacheType(MemoryCache))
 	err := c.Start(context.TODO())
@@ -22,6 +21,9 @@ func TestMemoryCacheGetSet(t *testing.T) {
 	err = i.Set(context.TODO(), "key", "value")
 	assert.NoError(t, err)
 
+	// Even if a Set gets applied, it might take a few milliseconds after the call has returned to the user.
+	// In database terms, it is an eventual consistency model.
+	time.Sleep(10 * time.Millisecond)
 	val, err := i.Get(context.TODO(), "key")
 	assert.NoError(t, err)
 	assert.Equal(t, "value", val)
@@ -38,7 +40,9 @@ func TestMemoryCachePop(t *testing.T) {
 
 	err = i.Set(context.TODO(), "key", "value")
 	assert.NoError(t, err)
-
+	// Even if a Set gets applied, it might take a few milliseconds after the call has returned to the user.
+	// In database terms, it is an eventual consistency model.
+	time.Sleep(10 * time.Millisecond)
 	val, err := i.Pop(context.TODO(), "key")
 	assert.NoError(t, err)
 	assert.Equal(t, "value", val)

@@ -99,9 +99,6 @@ func (c *memoryCache[T]) set(key string, v interface{}, ttl time.Duration) error
 	if !success {
 		return ErrCacheClosed
 	}
-	// Even if a Set gets applied, it might take a few milliseconds after the call has returned to the user.
-	// In database terms, it is an eventual consistency model.
-	time.Sleep(10 * time.Millisecond)
 	return nil
 }
 

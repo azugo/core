@@ -109,6 +109,7 @@ func newRedisClient(constr, password string) (redis.Cmdable, error) {
 	if len(password) != 0 {
 		redisOptions.Password = password
 	}
+
 	return redis.NewClient(redisOptions), nil
 }
 

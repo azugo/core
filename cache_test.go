@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"testing"
+	"time"
 
 	"azugo.io/core/cache"
 
@@ -32,6 +33,9 @@ func TestCacheInstrumentation(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.NoError(t, c.Set(context.TODO(), "key", "value"))
+		// Even if a Set gets applied, it might take a few milliseconds after the call has returned to the user.
+	// In database terms, it is an eventual consistency model.
+	time.Sleep(10 * time.Millisecond)
 	_, err = c.Get(context.TODO(), "key")
 	assert.NoError(t, err)
 	err = c.Delete(context.TODO(), "key")
