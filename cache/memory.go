@@ -112,7 +112,7 @@ func (c *memoryCache[T]) set(key string, v interface{}, ttl time.Duration) error
 func (c *memoryCache[T]) getWithLoader(ctx context.Context, key string, loader func(string) (interface{}, error)) (interface{}, error) {
 	v, err := loader(key)
 	if err != nil {
-		return nil, ErrKeyNotFound{Key: key}
+		return nil, err
 	}
 	err = c.set(key, v, c.ttl)
 	return v, err
