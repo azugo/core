@@ -6,6 +6,7 @@ require (
 	github.com/dgraph-io/ristretto v0.1.1
 	github.com/go-playground/validator/v10 v10.11.2
 	github.com/goccy/go-json v0.10.0
+	github.com/lafriks/pkcs8 v1.2.0
 	github.com/mattn/go-colorable v0.1.13
 	github.com/redis/go-redis/v9 v9.0.2
 	github.com/spf13/cobra v1.6.1
@@ -40,9 +41,9 @@ require (
 	github.com/subosito/gotenv v1.4.2 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
-	golang.org/x/crypto v0.5.0 // indirect
-	golang.org/x/sys v0.4.0 // indirect
-	golang.org/x/text v0.6.0 // indirect
+	golang.org/x/crypto v0.14.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
