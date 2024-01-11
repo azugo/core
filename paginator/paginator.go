@@ -13,6 +13,8 @@ var (
 	QueryParameterPage = "page"
 	// QueryParameterPage is URL query parameter to specify page size.
 	QueryParameterPerPage = "per_page"
+	// DefaultPageSize is a default number of items per page.
+	DefaultPageSize = 20
 )
 
 // Paginator represents a set of results of pagination calculations.
