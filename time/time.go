@@ -1,4 +1,4 @@
-package time
+package timex
 
 import (
 	"fmt"
@@ -18,13 +18,17 @@ func (t *Time) String() string {
 
 func (t *Time) MarshalJSON() ([]byte, error) {
 	if t == nil {
-		return []byte(""), nil
+		return []byte("null"), nil
 	}
 
 	return []byte(`"` + time.Time(*t).Format(time.RFC3339Nano) + `"`), nil
 }
 
 func (t *Time) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
+
 	tt, err := time.Parse(`"`+time.RFC3339Nano+`"`, string(data))
 	if err != nil {
 		return err
@@ -49,7 +53,7 @@ func (t *Date) String() string {
 
 func (t *Date) MarshalJSON() ([]byte, error) {
 	if t == nil {
-		return []byte(""), nil
+		return []byte("null"), nil
 	}
 
 	return []byte(time.Time(*t).Format(`"2006-01-02"`)), nil
