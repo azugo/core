@@ -1,4 +1,4 @@
-package datatypes
+package time
 
 import (
 	"fmt"
