@@ -29,6 +29,6 @@ steps:
       - vendor
     settings:
       token:
-        from_secrets: reviewdog_token
+        from_secret: reviewdog_token
     when:
       event: pull_request

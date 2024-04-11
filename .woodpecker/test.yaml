@@ -18,7 +18,7 @@ steps:
     commands:
       - go test -cover -coverprofile=coverage.out -covermode=atomic -json ./... > report.json
 
-  - name: test-results
+  - name: results
     image: golang:${GO_VERSION}-alpine
     environment:
       - CGO_ENABLED=0
