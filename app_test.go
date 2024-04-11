@@ -5,11 +5,10 @@ import (
 	"testing"
 
 	"azugo.io/core/config"
+
+	"github.com/go-quicktest/qt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func newTestApp() (*App, func(), *observer.ObservedLogs, error) {
@@ -37,15 +36,16 @@ func newTestApp() (*App, func(), *observer.ObservedLogs, error) {
 
 func TestNewApp(t *testing.T) {
 	a, cleanup, logs, err := newTestApp()
-	require.NoError(t, err)
-	require.NotNil(t, a)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNotNil(a))
 
 	t.Cleanup(cleanup)
 
-	assert.NoError(t, a.Start())
+	err = a.Start()
+	qt.Assert(t, qt.IsNil(err))
 
-	assert.Equal(t, EnvironmentDevelopment, a.Env())
-	assert.Len(t, logs.All(), 1)
-	assert.Equal(t, "Starting Test 1.0.0 (built with test)...", logs.All()[0].Message)
-	assert.Equal(t, "Test 1.0.0 (built with test)", a.String())
+	qt.Check(t, qt.Equals(a.Env(), EnvironmentDevelopment))
+	qt.Check(t, qt.HasLen(logs.All(), 1))
+	qt.Check(t, qt.Equals(logs.All()[0].Message, "Starting Test 1.0.0 (built with test)..."))
+	qt.Check(t, qt.Equals(a.String(), "Test 1.0.0 (built with test)"))
 }

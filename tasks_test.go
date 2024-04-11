@@ -5,8 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/go-quicktest/qt"
 )
 
 type testTask struct {
@@ -40,49 +39,57 @@ func (t *testErrTask) Name() string {
 
 func TestTaskStart(t *testing.T) {
 	a, cleanup, _, err := newTestApp()
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	t.Cleanup(cleanup)
 
 	task := &testTask{}
-	assert.NoError(t, a.AddTask(task))
+	err = a.AddTask(task)
+	qt.Check(t, qt.IsNil(err))
 
-	assert.False(t, task.started)
+	qt.Check(t, qt.IsFalse(task.started))
 
-	assert.NoError(t, a.Start())
+	err = a.Start()
+	qt.Check(t, qt.IsNil(err))
 
-	assert.True(t, task.started)
+	qt.Check(t, qt.IsTrue(task.started))
 }
 
 func TestAddTaskAfterStart(t *testing.T) {
 	a, cleanup, _, err := newTestApp()
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	t.Cleanup(cleanup)
 
-	assert.NoError(t, a.Start())
+	err = a.Start()
+	qt.Assert(t, qt.IsNil(err))
 
 	task := &testTask{}
-	assert.NoError(t, a.AddTask(task))
-	assert.True(t, task.started)
+	err = a.AddTask(task)
+	qt.Check(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(task.started))
 }
 
 func TestTaskStartError(t *testing.T) {
 	a, cleanup, _, err := newTestApp()
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	t.Cleanup(cleanup)
 
 	task := &testErrTask{}
-	assert.NoError(t, a.AddTask(task))
+	err = a.AddTask(task)
+	qt.Check(t, qt.IsNil(err))
 
-	assert.ErrorContains(t, a.Start(), "test start error")
+	err = a.Start()
+	qt.Check(t, qt.ErrorMatches(err, "test start error"))
 }
 
 func TestTaskAddError(t *testing.T) {
 	a, cleanup, _, err := newTestApp()
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	t.Cleanup(cleanup)
 
-	assert.NoError(t, a.Start())
+	err = a.Start()
+	qt.Assert(t, qt.IsNil(err))
 
 	task := &testErrTask{}
-	assert.ErrorContains(t, a.AddTask(task), "test start error")
+	err = a.AddTask(task)
+	qt.Check(t, qt.ErrorMatches(err, "test start error"))
 }

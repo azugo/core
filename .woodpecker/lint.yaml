@@ -5,9 +5,30 @@ when:
     - push
     - pull_request
 
-pipeline:
+steps:
+  - name: vendor
+    image: golang:1.22-alpine
+    commands:
+      - go mod vendor
+
   - name: golangci-lint
-    image: golangci/golangci-lint:v1.50-alpine
+    image: golangci/golangci-lint:v1.57-alpine
     pull: true
+    depends_on:
+      - vendor
     commands:
       - golangci-lint run --timeout 3m --out-format=checkstyle:golangci-lint.out,colored-line-number
+    when:
+      branch: main
+      event: push
+
+  - name: review-go
+    image: woodpeckerci/plugin-reviewdog-golangci-lint:1.57
+    pull: true
+    depends_on:
+      - vendor
+    settings:
+      token:
+        from_secrets: reviewdog_token
+    when:
+      event: pull_request

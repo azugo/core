@@ -12,14 +12,14 @@ import (
 	"go.uber.org/zap"
 )
 
-// Runnable provides methods to run application that will gracefully stop
+// Runnable provides methods to run application that will gracefully stop.
 type Runnable interface {
 	Start() error
 	Log() *zap.Logger
 	Stop()
 }
 
-// Run starts an application and waits for it to finish
+// Run starts an application and waits for it to finish.
 func Run(a Runnable) {
 	// Catch interrupts for gracefully stopping background node proecess
 	done := make(chan os.Signal, 1)

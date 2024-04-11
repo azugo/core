@@ -40,9 +40,11 @@ func pemBlockForKey(priv any, opt ...Option) (*pem.Block, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal private key: %w", err)
 	}
+
 	if len(opts.Password) > 0 {
 		return &pem.Block{Type: PEMBlockEncryptedPrivateKey, Bytes: b}, nil
 	}
+
 	return &pem.Block{Type: PEMBlockPrivateKey, Bytes: b}, nil
 }
 
@@ -54,18 +56,23 @@ func DERBytesToPEMBlocks(der []byte, priv any, opt ...Option) ([]byte, []byte, e
 	if err := pem.Encode(out, &pem.Block{Type: PEMBlockCertificate, Bytes: der}); err != nil {
 		return nil, nil, err
 	}
+
 	cert := append([]byte{}, out.Bytes()...)
 
 	var key []byte
+
 	if priv != nil {
 		out.Reset()
+
 		block, err := pemBlockForKey(priv, opt...)
 		if err != nil {
 			return nil, nil, err
 		}
+
 		if err := pem.Encode(out, block); err != nil {
 			return nil, nil, err
 		}
+
 		key = append([]byte{}, out.Bytes()...)
 	}
 

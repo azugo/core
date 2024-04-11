@@ -14,22 +14,27 @@ func (a *App) initCache() error {
 	}
 
 	conf := a.Config().Cache
-	opts := []cache.CacheOption{
+	opts := []cache.Option{
 		conf.Type,
 		cache.Instrumenter(a.Instrumenter()),
 	}
+
 	if conf.TTL > 0 {
 		opts = append(opts, cache.DefaultTTL(conf.TTL))
 	}
+
 	if len(conf.ConnectionString) != 0 {
 		opts = append(opts, cache.ConnectionString(conf.ConnectionString))
 	}
+
 	if len(conf.Password) != 0 {
 		opts = append(opts, cache.ConnectionPassword(conf.Password))
 	}
+
 	if len(conf.KeyPrefix) != 0 {
 		opts = append(opts, cache.KeyPrefix(conf.KeyPrefix))
 	}
+
 	a.cache = cache.New(opts...)
 
 	return a.cache.Start(a.BackgroundContext())
@@ -39,6 +44,7 @@ func (a *App) closeCache() {
 	if a.cache == nil {
 		return
 	}
+
 	a.cache.Close()
 }
 
@@ -48,5 +54,6 @@ func (a *App) Cache() *cache.Cache {
 			panic(err)
 		}
 	}
+
 	return a.cache
 }

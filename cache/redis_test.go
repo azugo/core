@@ -6,8 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/go-quicktest/qt"
 )
 
 func getRedisConnStr() string {
@@ -20,20 +19,20 @@ func TestReidsCacheGetSet(t *testing.T) {
 		t.Skipped()
 		return
 	}
-	c := New(CacheType(RedisCache), KeyPrefix("prefix"), ConnectionString(cs))
+	c := New(RedisCache, KeyPrefix("prefix"), ConnectionString(cs))
 	err := c.Start(context.TODO())
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer c.Close()
 
 	i, err := Create[string](c, "test")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 
 	err = i.Set(context.TODO(), "key1", "value")
-	assert.NoError(t, err)
+	qt.Check(t, qt.IsNil(err))
 
 	val, err := i.Get(context.TODO(), "key1")
-	assert.NoError(t, err)
-	assert.Equal(t, "value", val)
+	qt.Check(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(val, "value"))
 }
 
 func TestRedisCachePop(t *testing.T) {
@@ -42,24 +41,24 @@ func TestRedisCachePop(t *testing.T) {
 		t.Skipped()
 		return
 	}
-	c := New(CacheType(RedisCache), ConnectionString(cs))
+	c := New(RedisCache, ConnectionString(cs))
 	err := c.Start(context.TODO())
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer c.Close()
 
 	i, err := Create[string](c, "test")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 
 	err = i.Set(context.TODO(), "key2", "value")
-	assert.NoError(t, err)
+	qt.Check(t, qt.IsNil(err))
 
 	val, err := i.Pop(context.TODO(), "key2")
-	assert.NoError(t, err)
-	assert.Equal(t, "value", val)
+	qt.Check(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(val, "value"))
 
 	val, err = i.Pop(context.TODO(), "key2")
-	assert.Error(t, err)
-	assert.Empty(t, val)
+	qt.Check(t, qt.IsNotNil(err))
+	qt.Check(t, qt.Equals(val, ""))
 }
 
 func TestRedisCacheDelete(t *testing.T) {
@@ -68,23 +67,23 @@ func TestRedisCacheDelete(t *testing.T) {
 		t.Skipped()
 		return
 	}
-	c := New(CacheType(RedisCache), ConnectionString(cs))
+	c := New(RedisCache, ConnectionString(cs))
 	err := c.Start(context.TODO())
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer c.Close()
 
 	i, err := Create[string](c, "test")
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 
 	err = i.Set(context.TODO(), "key3", "value")
-	assert.NoError(t, err)
+	qt.Check(t, qt.IsNil(err))
 
 	err = i.Delete(context.TODO(), "key3")
-	assert.NoError(t, err)
+	qt.Check(t, qt.IsNil(err))
 
 	val, err := i.Get(context.TODO(), "key3")
-	assert.NoError(t, err)
-	assert.Empty(t, val)
+	qt.Check(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(val, ""))
 }
 
 func TestRedisCacheExpire(t *testing.T) {
@@ -93,20 +92,20 @@ func TestRedisCacheExpire(t *testing.T) {
 		t.Skipped()
 		return
 	}
-	c := New(CacheType(RedisCache), ConnectionString(cs))
+	c := New(RedisCache, ConnectionString(cs))
 	err := c.Start(context.TODO())
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	defer c.Close()
 
 	i, err := Create[string](c, "test", DefaultTTL(100*time.Millisecond))
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 
 	err = i.Set(context.TODO(), "key4", "value")
-	assert.NoError(t, err)
+	qt.Check(t, qt.IsNil(err))
 
 	time.Sleep(150 * time.Millisecond)
 
 	val, err := i.Get(context.TODO(), "key4")
-	assert.NoError(t, err)
-	assert.Empty(t, val)
+	qt.Check(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(val, ""))
 }

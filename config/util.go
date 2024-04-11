@@ -23,5 +23,6 @@ func LoadRemoteSecret(name string) (string, error) {
 			return string(bytes.TrimSpace(content)), nil
 		}
 	}
+
 	return "", nil
 }

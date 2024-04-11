@@ -13,22 +13,25 @@ func (i Instrumenter) Observe(ctx context.Context, op string, args ...any) func(
 	if i != nil {
 		return i(ctx, op, args...)
 	}
-	return func(err error) {}
+
+	return func(_ error) {}
 }
 
 // NullInstrumenter is a no-op instrumenter.
-func NullInstrumenter(ctx context.Context, op string, args ...any) func(err error) {
-	return func(err error) {}
+func NullInstrumenter(_ context.Context, _ string, _ ...any) func(err error) {
+	return func(_ error) {}
 }
 
 // CombinedInstrumenter is an instrumenter that combines multiple instrumenters.
 func CombinedInstrumenter(instr ...Instrumenter) Instrumenter {
 	return func(ctx context.Context, op string, args ...any) func(err error) {
 		l := len(instr)
+
 		cb := make([]func(error), l)
 		for i, ii := range instr {
 			cb[l-i-1] = ii.Observe(ctx, op, args...)
 		}
+
 		return func(err error) {
 			for _, c := range cb {
 				c(err)

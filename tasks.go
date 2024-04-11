@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-// Tasker interface for staring task
+// Tasker interface for staring task.
 type Tasker interface {
 	// Start task
 	//
@@ -31,6 +31,7 @@ func (a *App) startTasks() error {
 	}
 
 	a.started = true
+
 	return nil
 }
 
@@ -57,5 +58,6 @@ func (a *App) AddTask(task Tasker) error {
 	if a.started {
 		return task.Start(a.BackgroundContext())
 	}
+
 	return nil
 }

@@ -11,6 +11,7 @@ func LoadTLSCertificate(cert, key []byte) (*tls.Certificate, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &crt, nil
 }
 
@@ -20,6 +21,7 @@ func ParseTLSCertificateFromReader(r io.Reader, opt ...Option) (*tls.Certificate
 	if err != nil {
 		return nil, err
 	}
+
 	return LoadTLSCertificate(crt, key)
 }
 
@@ -29,5 +31,6 @@ func ParseTLSCertificateFromFile(path string, opt ...Option) (*tls.Certificate, 
 	if err != nil {
 		return nil, err
 	}
+
 	return LoadTLSCertificate(crt, key)
 }

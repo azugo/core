@@ -24,7 +24,8 @@ func CreateDevPEM(dns ...string) ([]byte, any, error) {
 		return nil, nil, err
 	}
 
-	var max *big.Int = big.NewInt(0).Exp(big.NewInt(2), big.NewInt(130), nil)
+	max := big.NewInt(0).Exp(big.NewInt(2), big.NewInt(130), nil)
+
 	serial, err := rand.Int(rand.Reader, max)
 	if err != nil {
 		return nil, nil, err
@@ -49,6 +50,7 @@ func CreateDevPEM(dns ...string) ([]byte, any, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+
 	return der, priv, nil
 }
 
@@ -58,6 +60,7 @@ func DevPEMFile(name string, dns ...string) ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+
 	path := filepath.Join(dataDir, name+".pem")
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -65,15 +68,18 @@ func DevPEMFile(name string, dns ...string) ([]byte, []byte, error) {
 		if err != nil {
 			return nil, nil, err
 		}
+
 		cert, key, err := DERBytesToPEMBlocks(der, priv)
 		if err != nil {
 			return nil, nil, err
 		}
+
 		f, err := os.Create(path)
 		if err != nil {
 			return nil, nil, err
 		}
 		defer f.Close()
+
 		_, _ = f.Write(cert)
 		_, _ = f.WriteString("\n")
 		_, _ = f.Write(key)

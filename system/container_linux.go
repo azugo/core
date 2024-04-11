@@ -17,6 +17,7 @@ func detectContainer() (*Container, error) {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
+
 		return nil, err
 	}
 	defer f.Close()
@@ -29,12 +30,14 @@ func detectContainer() (*Container, error) {
 		}
 
 		path := p[2]
+
 		idx := strings.LastIndex(path, ":")
 		if idx == -1 {
 			if idx = strings.LastIndex(path, "/"); idx == -1 {
 				continue
 			}
 		}
+
 		dirname, basename := path[:idx], path[idx+1:]
 
 		if strings.HasSuffix(basename, ".scope") {
@@ -78,6 +81,7 @@ func detectContainerV2() (*Container, error) {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
+
 		return nil, err
 	}
 	defer f.Close()

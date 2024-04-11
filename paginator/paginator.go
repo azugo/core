@@ -8,7 +8,7 @@ import (
 	"net/url"
 )
 
-var (
+const (
 	// QueryParameterPage is URL query parameter to specify page number.
 	QueryParameterPage = "page"
 	// QueryParameterPage is URL query parameter to specify page size.
@@ -30,17 +30,21 @@ func New(total, pageSize, current int) *Paginator {
 	if pageSize <= 0 {
 		pageSize = 1
 	}
+
 	if current <= 0 {
 		current = 1
 	}
+
 	p := &Paginator{
 		total:    total,
 		pageSize: pageSize,
 		current:  current,
 	}
+
 	if p.current > p.TotalPages() {
 		p.current = p.TotalPages()
 	}
+
 	return p
 }
 
@@ -68,6 +72,7 @@ func (p *Paginator) Previous() int {
 	if !p.HasPrevious() {
 		return p.current
 	}
+
 	return p.current - 1
 }
 
@@ -80,6 +85,7 @@ func (p *Paginator) Next() int {
 	if !p.HasNext() {
 		return p.current
 	}
+
 	return p.current + 1
 }
 
@@ -88,6 +94,7 @@ func (p *Paginator) IsLast() bool {
 	if p.total == 0 {
 		return true
 	}
+
 	return p.total > (p.current-1)*p.pageSize && !p.HasNext()
 }
 
@@ -101,9 +108,11 @@ func (p *Paginator) TotalPages() int {
 	if p.total == 0 {
 		return 1
 	}
+
 	if p.total%p.pageSize == 0 {
 		return p.total / p.pageSize
 	}
+
 	return p.total/p.pageSize + 1
 }
 

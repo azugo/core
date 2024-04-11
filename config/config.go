@@ -54,13 +54,13 @@ type CmdBinder interface {
 // extended configuration.
 type Configurable interface {
 	Core() *Configuration
-	Loaded(*Configuration)
+	Loaded(conf *Configuration)
 }
 
 // Validatable is an interface that can be implemented by configuration
 // section to validate the configuration.
 type Validatable interface {
-	Validate(*validation.Validate) error
+	Validate(v *validation.Validate) error
 }
 
 // Bind configuration section if it implements Binder interface.
@@ -68,9 +68,11 @@ func Bind[T any](c *T, prefix string, v *viper.Viper) *T {
 	if c == nil {
 		c = new(T)
 	}
+
 	if b, ok := any(c).(Binder); ok {
 		b.Bind(prefix, v)
 	}
+
 	return c
 }
 
@@ -145,6 +147,7 @@ func (c *Configuration) Load(cmd *cobra.Command, config any, environment string)
 
 	if len(configPath) == 0 && len(environment) > 0 {
 		c.v.SetConfigName(c.configName + "." + environment)
+
 		if err := c.v.MergeInConfig(); err != nil {
 			if !errors.As(err, &viper.ConfigFileNotFoundError{}) {
 				return fmt.Errorf("failed to merge configuration: %w", err)
@@ -177,6 +180,7 @@ func (c *Configuration) Validate(validate *validation.Validate) error {
 	if err := c.Cache.Validate(validate); err != nil {
 		return err
 	}
+
 	return nil
 }
 
