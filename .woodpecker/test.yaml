@@ -7,7 +7,6 @@ when:
 
 matrix:
   GO_VERSION:
-    - 1.21
     - 1.22
 
 steps:
