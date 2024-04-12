@@ -10,7 +10,17 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func responseBody(resp *Response) ([]byte, error) {
+func (c clientInstance) call(req *Request) ([]byte, error) {
+	resp := c.NewResponse()
+	defer c.ReleaseResponse(resp)
+
+	err := c.Do(req, resp)
+	c.ReleaseRequest(req)
+
+	if err != nil {
+		return nil, err
+	}
+
 	if err := resp.Error(); err != nil {
 		return nil, err
 	}
@@ -32,17 +42,7 @@ func (c clientInstance) Get(uri string, opt ...RequestOption) ([]byte, error) {
 
 	req.apply(opt)
 
-	resp := c.NewResponse()
-	defer c.ReleaseResponse(resp)
-
-	err := c.Do(req, resp)
-	c.ReleaseRequest(req)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return responseBody(resp)
+	return c.call(req)
 }
 
 // GetJSON performs a GET request to the specified URI and unmarshals the response into v.
@@ -73,17 +73,7 @@ func (c clientInstance) Post(uri string, body []byte, opt ...RequestOption) ([]b
 	req.Header.SetMethod(fasthttp.MethodPost)
 	req.SetBodyRaw(body)
 
-	resp := c.NewResponse()
-	defer c.ReleaseResponse(resp)
-
-	err := c.Do(req, resp)
-	c.ReleaseRequest(req)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return responseBody(resp)
+	return c.call(req)
 }
 
 // PostJSON performs a POST request to the specified URI and unmarshals the response into v.
@@ -153,17 +143,7 @@ func (c clientInstance) PostMultipartForm(uri string, form *multipart.Form, opt 
 	req.SetBodyRaw(buf.Bytes())
 	c.bufferPool.Put(buf)
 
-	resp := c.NewResponse()
-	defer c.ReleaseResponse(resp)
-
-	err := c.Do(req, resp)
-	c.ReleaseRequest(req)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return responseBody(resp)
+	return c.call(req)
 }
 
 // Put performs a PUT request to the specified URI.
@@ -178,17 +158,7 @@ func (c clientInstance) Put(uri string, body []byte, opt ...RequestOption) ([]by
 	req.Header.SetMethod(fasthttp.MethodPut)
 	req.SetBodyRaw(body)
 
-	resp := c.NewResponse()
-	defer c.ReleaseResponse(resp)
-
-	err := c.Do(req, resp)
-	c.ReleaseRequest(req)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return responseBody(resp)
+	return c.call(req)
 }
 
 // PutJSON performs a PUT request to the specified URI and unmarshals the response into v.
@@ -224,17 +194,7 @@ func (c clientInstance) Patch(uri string, body []byte, opt ...RequestOption) ([]
 	req.Header.SetMethod(fasthttp.MethodPatch)
 	req.SetBodyRaw(body)
 
-	resp := c.NewResponse()
-	defer c.ReleaseResponse(resp)
-
-	err := c.Do(req, resp)
-	c.ReleaseRequest(req)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return responseBody(resp)
+	return c.call(req)
 }
 
 // PatchJSON performs a PATCH request to the specified URI and unmarshals the response into v.

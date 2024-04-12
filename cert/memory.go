@@ -27,22 +27,22 @@ func LoadPEMFromReader(r io.Reader, opt ...Option) ([]byte, []byte, error) {
 			break
 		}
 
-		switch {
-		case block.Type == PEMBlockCertificate:
+		switch block.Type {
+		case PEMBlockCertificate:
 			out := &bytes.Buffer{}
 			if err = pem.Encode(out, block); err != nil {
 				return nil, nil, err
 			}
 
 			cert = out.Bytes()
-		case block.Type == PEMBlockPrivateKey || block.Type == PEMBlockRSAPrivateKey || block.Type == PEMBlockECPrivateKey:
+		case PEMBlockPrivateKey, PEMBlockRSAPrivateKey, PEMBlockECPrivateKey:
 			out := &bytes.Buffer{}
 			if err = pem.Encode(out, block); err != nil {
 				return nil, nil, err
 			}
 
 			key = out.Bytes()
-		case block.Type == PEMBlockEncryptedPrivateKey:
+		case PEMBlockEncryptedPrivateKey:
 			if len(opts.Password) == 0 {
 				return nil, nil, errors.New("password required to decrypt private key")
 			}
