@@ -7,13 +7,12 @@ import (
 
 	"azugo.io/core/cache"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/go-quicktest/qt"
 )
 
 func TestCacheInstrumentation(t *testing.T) {
 	a, cleanup, _, err := newTestApp()
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	t.Cleanup(cleanup)
 
 	actions := make([]string, 0, 4)
@@ -25,51 +24,53 @@ func TestCacheInstrumentation(t *testing.T) {
 		}
 	})
 
-	require.NoError(t, a.Start())
+	err = a.Start()
+	qt.Assert(t, qt.IsNil(err))
 
 	c, err := cache.Create[string](a.Cache(), "test", cache.Loader(func(_ context.Context, key string) (any, error) {
 		return "loaded", nil
 	}))
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 
-	assert.NoError(t, c.Set(context.TODO(), "key", "value"))
-		// Even if a Set gets applied, it might take a few milliseconds after the call has returned to the user.
+	qt.Assert(t, qt.IsNil(c.Set(context.TODO(), "key", "value")))
+	// Even if a Set gets applied, it might take a few milliseconds after the call has returned to the user.
 	// In database terms, it is an eventual consistency model.
 	time.Sleep(10 * time.Millisecond)
 	_, err = c.Get(context.TODO(), "key")
-	assert.NoError(t, err)
+	qt.Check(t, qt.IsNil(err))
 	err = c.Delete(context.TODO(), "key")
+	qt.Check(t, qt.IsNil(err))
 
 	val, err := c.Get(context.TODO(), "key")
-	assert.Equal(t, "loaded", val)
-	assert.NoError(t, err)
+	qt.Check(t, qt.Equals(val, "loaded"))
+	qt.Check(t, qt.IsNil(err))
 
 	a.Cache().Ping(context.TODO())
 
 	a.Stop()
 
-	assert.Equal(t, []string{
-		cache.InstrumentationCacheStart,
-		cache.InstrumentationCacheStart + ":end",
+	qt.Check(t, qt.DeepEquals(actions, []string{
+		cache.InstrumentationStart,
+		cache.InstrumentationStart + ":end",
 
-		cache.InstrumentationCacheSet,
-		cache.InstrumentationCacheSet + ":end",
+		cache.InstrumentationSet,
+		cache.InstrumentationSet + ":end",
 
-		cache.InstrumentationCacheGet,
-		cache.InstrumentationCacheGet + ":end",
+		cache.InstrumentationGet,
+		cache.InstrumentationGet + ":end",
 
-		cache.InstrumentationCacheDelete,
-		cache.InstrumentationCacheDelete + ":end",
+		cache.InstrumentationDelete,
+		cache.InstrumentationDelete + ":end",
 
-		cache.InstrumentationCacheGet,
-		cache.InstrumentationCacheLoader,
-		cache.InstrumentationCacheLoader + ":end",
-		cache.InstrumentationCacheGet + ":end",
+		cache.InstrumentationGet,
+		cache.InstrumentationLoader,
+		cache.InstrumentationLoader + ":end",
+		cache.InstrumentationGet + ":end",
 
-		cache.InstrumentationCachePing,
-		cache.InstrumentationCachePing + ":end",
+		cache.InstrumentationPing,
+		cache.InstrumentationPing + ":end",
 
-		cache.InstrumentationCacheClose,
-		cache.InstrumentationCacheClose + ":end",
-	}, actions)
+		cache.InstrumentationClose,
+		cache.InstrumentationClose + ":end",
+	}))
 }

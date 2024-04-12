@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/go-quicktest/qt"
 )
 
 var testCerts = map[string]struct {
@@ -77,9 +77,9 @@ func TestParseTLSCertificateFromReader(t *testing.T) {
 	for name, test := range testCerts {
 		t.Run(name, func(t *testing.T) {
 			cert, err := ParseTLSCertificateFromReader(bytes.NewBuffer(test.Buf), Password(test.Password))
-			require.NoError(t, err)
-			require.NotNil(t, cert.PrivateKey)
-			require.Len(t, cert.Certificate, 1)
+			qt.Assert(t, qt.IsNil(err))
+			qt.Check(t, qt.IsNotNil(cert.PrivateKey))
+			qt.Check(t, qt.HasLen(cert.Certificate, 1))
 		})
 	}
 }
@@ -88,12 +88,12 @@ func TestDERBytesToPEMBlocks(t *testing.T) {
 	for name, test := range testCerts {
 		t.Run(name, func(t *testing.T) {
 			cert, err := ParseTLSCertificateFromReader(bytes.NewBuffer(test.Buf), Password(test.Password))
-			require.NoError(t, err)
+			qt.Assert(t, qt.IsNil(err))
 
 			crt, key, err := DERBytesToPEMBlocks(cert.Certificate[0], cert.PrivateKey, Password(test.Password))
-			require.NoError(t, err)
-			require.NotNil(t, crt)
-			require.NotNil(t, key)
+			qt.Assert(t, qt.IsNil(err))
+			qt.Check(t, qt.IsNotNil(crt))
+			qt.Check(t, qt.IsNotNil(key))
 		})
 	}
 }

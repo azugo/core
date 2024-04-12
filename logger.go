@@ -21,29 +21,36 @@ func (a *App) loggerFields(info *system.Info) []zap.Field {
 	if a.AppName != "" {
 		fields = append(fields, zap.String("service.name", a.AppName))
 	}
+
 	if a.AppVer != "" {
 		fields = append(fields, zap.String("service.version", a.AppVer))
 	}
+
 	fields = append(fields, zap.String("service.environment", strings.ToLower(string(a.Env()))))
 
 	if info != nil {
 		if info.Hostname != "" {
 			fields = append(fields, zap.String("host.hostname", info.Hostname))
 		}
+
 		if info.IsContainer() {
 			if info.Container.ID != "" {
 				fields = append(fields, zap.String("container.id", info.Container.ID))
 			}
+
 			if info.IsKubernetes() {
 				if info.Container.Kubernetes.Namespace != "" {
 					fields = append(fields, zap.String("kubernetes.namespace", info.Container.Kubernetes.Namespace))
 				}
+
 				if info.Container.Kubernetes.PodName != "" {
 					fields = append(fields, zap.String("kubernetes.pod.name", info.Container.Kubernetes.PodName))
 				}
+
 				if info.Container.Kubernetes.PodUID != "" {
 					fields = append(fields, zap.String("kubernetes.pod.uid", info.Container.Kubernetes.PodUID))
 				}
+
 				if info.Container.Kubernetes.NodeName != "" {
 					fields = append(fields, zap.String("kubernetes.node.name", info.Container.Kubernetes.NodeName))
 				}
@@ -57,6 +64,7 @@ func (a *App) loggerFields(info *system.Info) []zap.Field {
 func (a *App) initLogger() {
 	a.loglock.Lock()
 	defer a.loglock.Unlock()
+
 	if a.logger != nil {
 		return
 	}
@@ -94,6 +102,7 @@ func (a *App) initLogger() {
 // Default fields are automatically added to the logger.
 func (a *App) ReplaceLogger(logger *zap.Logger) error {
 	a.logger = logger.With(a.loggerFields(system.CollectInfo())...)
+
 	return nil
 }
 
@@ -102,6 +111,7 @@ func (a *App) Log() *zap.Logger {
 	if a.logger == nil {
 		a.initLogger()
 	}
+
 	return a.logger
 }
 
@@ -110,5 +120,6 @@ func parseLogLevel(level string, defaultLevel zapcore.Level) zapcore.Level {
 	if err != nil {
 		return defaultLevel
 	}
+
 	return l
 }

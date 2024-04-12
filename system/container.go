@@ -40,5 +40,6 @@ func containerInfo() *Container {
 			container, _ = detectContainerV2()
 		}
 	})
+
 	return container
 }

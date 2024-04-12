@@ -9,12 +9,13 @@ func opts(opt ...Option) *options {
 	for _, opt := range opt {
 		opt.apply(o)
 	}
+
 	return o
 }
 
 // Option for loading a certificates.
 type Option interface {
-	apply(*options)
+	apply(opt *options)
 }
 
 // Password to decrypt the private key.

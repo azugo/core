@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/go-quicktest/qt"
 )
 
 func TestInstrumenter(t *testing.T) {
@@ -13,18 +13,18 @@ func TestInstrumenter(t *testing.T) {
 	var start, end bool
 	i = func(ctx context.Context, op string, args ...any) func(err error) {
 		start = true
-		assert.Equal(t, "op", op)
+		qt.Check(t, qt.Equals(op, "op"))
 		return func(err error) {
-			assert.ErrorContains(t, err, "test error")
+			qt.Check(t, qt.ErrorMatches(err, "test error"))
 			end = true
 		}
 	}
 
 	cb := i.Observe(context.Background(), "op")
-	assert.True(t, start)
-	assert.False(t, end)
+	qt.Check(t, qt.IsTrue(start))
+	qt.Check(t, qt.IsFalse(end))
 	cb(errors.New("test error"))
-	assert.True(t, end)
+	qt.Check(t, qt.IsTrue(end))
 }
 
 func TestCombinedInstrumenters(t *testing.T) {
@@ -34,31 +34,31 @@ func TestCombinedInstrumenters(t *testing.T) {
 
 	i = CombinedInstrumenter(
 		func(ctx context.Context, op string, args ...any) func(err error) {
-			assert.Equal(t, "op", op)
+			qt.Check(t, qt.Equals(op, "op"))
 			calls = append(calls, "1s")
 			return func(err error) {
-				assert.ErrorContains(t, err, "test error")
+				qt.Check(t, qt.ErrorMatches(err, "test error"))
 				calls = append(calls, "1e")
 			}
 		},
 		func(ctx context.Context, op string, args ...any) func(err error) {
-			assert.Equal(t, "op", op)
+			qt.Check(t, qt.DeepEquals(op, "op"))
 			calls = append(calls, "2s")
 			return func(err error) {
-				assert.ErrorContains(t, err, "test error")
+				qt.Check(t, qt.ErrorMatches(err, "test error"))
 				calls = append(calls, "2e")
 			}
 		},
 	)
 
 	cb := i.Observe(context.Background(), "op")
-	assert.Equal(t, []string{"1s", "2s"}, calls)
+	qt.Check(t, qt.DeepEquals(calls, []string{"1s", "2s"}))
 	cb(errors.New("test error"))
-	assert.Equal(t, []string{"1s", "2s", "2e", "1e"}, calls)
+	qt.Check(t, qt.DeepEquals(calls, []string{"1s", "2s", "2e", "1e"}))
 }
 
 func TestNilInstrumenter(t *testing.T) {
 	var i Instrumenter
 	cb := i.Observe(context.Background(), "op")
-	assert.NotNil(t, cb)
+	qt.Check(t, qt.IsNotNil(cb))
 }

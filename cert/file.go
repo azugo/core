@@ -16,5 +16,6 @@ func LoadPEMFromFile(path string, opt ...Option) ([]byte, []byte, error) {
 		return nil, nil, err
 	}
 	defer r.Close()
+
 	return LoadPEMFromReader(r, opt...)
 }

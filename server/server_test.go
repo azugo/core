@@ -11,8 +11,7 @@ import (
 	"azugo.io/core/cache"
 	"azugo.io/core/test"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/go-quicktest/qt"
 )
 
 type App struct {
@@ -40,11 +39,11 @@ func (a *App) Stop() {
 }
 
 func TestApp(t *testing.T) {
-	a, err := New(nil, ServerOptions{
+	a, err := New(nil, Options{
 		AppName: "Test",
 		AppVer:  "1.0.0",
 	})
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	_ = test.ObservedLogs(a)
 	app := &App{
 		App: a,
@@ -53,14 +52,14 @@ func TestApp(t *testing.T) {
 	go Run(app)
 	time.Sleep(100 * time.Millisecond)
 
-	assert.True(t, app.Config().Ready())
-	assert.Equal(t, cache.MemoryCache, a.Config().Cache.Type)
-	assert.Equal(t, core.EnvironmentProduction, app.Env())
-	assert.NoError(t, a.Cache().Ping(context.TODO()))
+	qt.Check(t, qt.IsTrue(app.Config().Ready()))
+	qt.Check(t, qt.Equals(a.Config().Cache.Type, cache.MemoryCache))
+	qt.Check(t, qt.Equals(app.Env(), core.EnvironmentProduction))
+	qt.Check(t, qt.IsNil(a.Cache().Ping(context.TODO())))
 
 	// Signal interrupt to stop app
 	proc, err := os.FindProcess(os.Getpid())
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	proc.Signal(os.Interrupt)
 	// Wait for app to finish
 	app.wg.Wait()

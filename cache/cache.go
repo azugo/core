@@ -13,44 +13,43 @@ import (
 )
 
 const (
-	InstrumentationCacheStart  = "cache-start"
-	InstrumentationCacheClose  = "cache-close"
-	InstrumentationCachePing   = "cache-ping"
-	InstrumentationCacheGet    = "cache-get"
-	InstrumentationCacheLoader = "cache-loader"
-	InstrumentationCacheSet    = "cache-set"
-	InstrumentationCacheDelete = "cache-delete"
+	InstrumentationStart  = "cache-start"
+	InstrumentationClose  = "cache-close"
+	InstrumentationPing   = "cache-ping"
+	InstrumentationGet    = "cache-get"
+	InstrumentationLoader = "cache-loader"
+	InstrumentationSet    = "cache-set"
+	InstrumentationDelete = "cache-delete"
 )
 
 var ErrCacheClosed = errors.New("cache closed")
 
-type ErrKeyNotFound struct {
+type KeyNotFoundError struct {
 	Key string
 }
 
-func (e ErrKeyNotFound) Error() string {
+func (e KeyNotFoundError) Error() string {
 	return fmt.Sprintf("Key '%s' not found in cache", e.Key)
 }
 
 // Cache represents a cache.
 type Cache struct {
-	options     []CacheOption
+	options     []Option
 	cache       map[string]any
 	redisCon    redis.Cmdable
 	redisConStr string
 }
 
 // New creates a new cache with specified type.
-func New(opts ...CacheOption) *Cache {
-	c := &Cache{
+func New(opts ...Option) *Cache {
+	return &Cache{
 		options: opts,
 		cache:   make(map[string]any),
 	}
-	return c
 }
 
-// CacheInstance represents a cache instance.
-type CacheInstance[T any] interface {
+// Instance of a cache.
+type Instance[T any] interface {
 	// Get value from cache. If value is not found, it will return default value.
 	Get(ctx context.Context, key string, opts ...ItemOption[T]) (T, error)
 	// Pop returns value from tha cache and deletes it. If value is not found, it will return ErrKeyNotFound error.
@@ -61,14 +60,14 @@ type CacheInstance[T any] interface {
 	Delete(ctx context.Context, key string) error
 }
 
-// CacheInstanceCloser represents a cache instance close method.
-type CacheInstanceCloser interface {
+// InstanceCloser represents a cache instance close method.
+type InstanceCloser interface {
 	// Close cache instance.
 	Close()
 }
 
-// CacheInstancePinger represents a cache instance ping method.
-type CacheInstancePinger interface {
+// InstancePinger represents a cache instance ping method.
+type InstancePinger interface {
 	Ping(ctx context.Context) error
 }
 
@@ -76,24 +75,32 @@ type CacheInstancePinger interface {
 func (c *Cache) Start(ctx context.Context) error {
 	opt := newCacheOptions(c.options...)
 
-	finish := opt.Instrumenter.Observe(ctx, InstrumentationCacheStart)
+	finish := opt.Instrumenter.Observe(ctx, InstrumentationStart)
 
 	if opt.Type == RedisCache || opt.Type == RedisClusterCache {
-		var err error
-		var con redis.Cmdable
+		var (
+			con redis.Cmdable
+			err error
+		)
+
 		if opt.Type == RedisCache {
 			con, err = newRedisClient(opt.ConnectionString, opt.ConnectionPassword)
 		} else {
 			con, err = newRedisClusterClient(opt.ConnectionString, opt.ConnectionPassword)
 		}
+
 		if err != nil {
 			finish(err)
+
 			return err
 		}
+
 		c.redisCon = con
 		c.redisConStr = opt.ConnectionString
 	}
+
 	finish(nil)
+
 	return nil
 }
 
@@ -101,24 +108,31 @@ func (c *Cache) Start(ctx context.Context) error {
 func (c *Cache) Close() {
 	opt := newCacheOptions(c.options...)
 
-	finish := opt.Instrumenter.Observe(context.Background(), InstrumentationCacheClose)
+	finish := opt.Instrumenter.Observe(context.Background(), InstrumentationClose)
 	defer finish(nil)
 
 	if opt.Type == RedisCache {
-		v := c.redisCon.(*redis.Client)
-		_ = v.Close()
+		if v, ok := c.redisCon.(*redis.Client); ok {
+			_ = v.Close()
+		}
+
 		c.redisCon = nil
 	}
+
 	if opt.Type == RedisClusterCache {
-		v := c.redisCon.(*redis.ClusterClient)
-		_ = v.Close()
+		if v, ok := c.redisCon.(*redis.ClusterClient); ok {
+			_ = v.Close()
+		}
+
 		c.redisCon = nil
 	}
+
 	for _, i := range c.cache {
-		if c, ok := i.(CacheInstanceCloser); ok {
+		if c, ok := i.(InstanceCloser); ok {
 			c.Close()
 		}
 	}
+
 	c.cache = nil
 }
 
@@ -126,47 +140,56 @@ func (c *Cache) Close() {
 func (c *Cache) Ping(ctx context.Context) error {
 	opt := newCacheOptions(c.options...)
 
-	finish := opt.Instrumenter.Observe(ctx, InstrumentationCachePing)
+	finish := opt.Instrumenter.Observe(ctx, InstrumentationPing)
 
 	if (opt.Type == RedisCache || opt.Type == RedisClusterCache) && c.redisCon != nil {
 		if s := c.redisCon.Ping(ctx); s != nil && s.Err() != nil {
 			finish(s.Err())
+
 			return s.Err()
 		}
 	}
+
 	for _, i := range c.cache {
-		if c, ok := i.(CacheInstancePinger); ok {
+		if c, ok := i.(InstancePinger); ok {
 			if err := c.Ping(ctx); err != nil {
 				finish(err)
+
 				return err
 			}
 		}
 	}
+
 	finish(nil)
+
 	return nil
 }
 
 // Get returns pre-configured cache instance by name.
-func Get[T any](cache *Cache, name string) (CacheInstance[T], error) {
+func Get[T any](cache *Cache, name string) (Instance[T], error) {
 	i, ok := cache.cache[name]
 	if !ok {
 		return nil, errors.New("cache not found")
 	}
-	r, ok := i.(CacheInstance[T])
+
+	r, ok := i.(Instance[T])
 	if !ok {
 		return nil, errors.New("invalid cache type")
 	}
+
 	return r, nil
 }
 
 // Create new cache instance with specified name and options.
-func Create[T any](cache *Cache, name string, opts ...CacheOption) (CacheInstance[T], error) {
-	opt := append(append([]CacheOption{}, cache.options...), opts...)
+func Create[T any](cache *Cache, name string, opts ...Option) (Instance[T], error) {
+	opt := append(append([]Option{}, cache.options...), opts...)
 
 	o := newCacheOptions(opt...)
 
-	var c CacheInstance[T]
-	var err error
+	var (
+		c   Instance[T]
+		err error
+	)
 
 	switch o.Type {
 	case MemoryCache:
@@ -182,10 +205,8 @@ func Create[T any](cache *Cache, name string, opts ...CacheOption) (CacheInstanc
 				return nil, err
 			}
 		}
-		c, err = newRedisCache[T](name, con, opt...)
-		if err != nil {
-			return nil, err
-		}
+
+		c = newRedisCache[T](name, con, opt...)
 	case RedisClusterCache:
 		con := cache.redisCon
 		if o.ConnectionString != cache.redisConStr {
@@ -194,37 +215,44 @@ func Create[T any](cache *Cache, name string, opts ...CacheOption) (CacheInstanc
 				return nil, err
 			}
 		}
-		c, err = newRedisCache[T](name, con, opt...)
-		if err != nil {
-			return nil, err
-		}
+
+		c = newRedisCache[T](name, con, opt...)
 	}
+
 	if c != nil {
 		cache.cache[name] = c
+
 		return c, nil
 	}
+
 	return nil, errors.New("unsupported cache type")
 }
 
 // ValidateConnectionString validates connection string for specific cache type.
-func ValidateConnectionString(typ CacheType, connStr string) error {
+func ValidateConnectionString(typ Type, connStr string) error {
 	if typ == RedisCache {
 		if len(connStr) == 0 {
 			return errors.New("connection string can not be empty")
 		}
+
 		if _, err := ParseRedisURL(connStr); err != nil {
 			return err
 		}
+
 		return nil
 	}
+
 	if typ == RedisClusterCache {
 		if len(connStr) == 0 {
 			return errors.New("cluster connection string can not be empty")
 		}
+
 		if _, err := ParseRedisClusterURL(connStr); err != nil {
 			return err
 		}
+
 		return nil
 	}
+
 	return nil
 }

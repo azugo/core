@@ -11,6 +11,7 @@ import (
 
 	"azugo.io/core/cache"
 	"azugo.io/core/config"
+	"azugo.io/core/http"
 	"azugo.io/core/instrumenter"
 	"azugo.io/core/validation"
 
@@ -37,6 +38,9 @@ type App struct {
 
 	// Cache
 	cache *cache.Cache
+
+	// HTTP client
+	httpClient http.Client
 
 	// Tasks
 	stlock  sync.RWMutex
@@ -69,13 +73,13 @@ func New() *App {
 	}
 }
 
-// SetVersion sets application version and built with tags
+// SetVersion sets application version and built with tags.
 func (a *App) SetVersion(version, builtWith string) {
 	a.AppVer = version
 	a.AppBuiltWith = builtWith
 }
 
-// Env returns the current application environment
+// Env returns the current application environment.
 func (a *App) Env() Environment {
 	return a.env
 }
@@ -85,7 +89,7 @@ func (a *App) Validate() *validation.Validate {
 	return a.validate
 }
 
-// BackgroundContext returns global background context
+// BackgroundContext returns global background context.
 func (a *App) BackgroundContext() context.Context {
 	return a.bgctx
 }
@@ -100,11 +104,12 @@ func (a *App) String() string {
 	if len(bw) > 0 {
 		bw = fmt.Sprintf(" (built with %s)", bw)
 	}
+
 	return fmt.Sprintf("%s %s%s", name, a.AppVer, bw)
 }
 
-// SetConfig binds application configuration to the application
-func (a *App) SetConfig(cmd *cobra.Command, conf *config.Configuration) {
+// SetConfig binds application configuration to the application.
+func (a *App) SetConfig(_ *cobra.Command, conf *config.Configuration) {
 	if a.config != nil && a.config.Ready() {
 		return
 	}
@@ -119,6 +124,7 @@ func (a *App) Config() *config.Configuration {
 	if a.config == nil || !a.config.Ready() {
 		panic("configuration is not loaded")
 	}
+
 	return a.config
 }
 
@@ -126,8 +132,10 @@ func (a *App) Config() *config.Configuration {
 func (a *App) Instrumentation(instr instrumenter.Instrumenter) {
 	if instr == nil {
 		a.instrumenter = instrumenter.NullInstrumenter
+
 		return
 	}
+
 	a.instrumenter = instr
 }
 
@@ -139,19 +147,23 @@ func (a *App) Instrumenter() instrumenter.Instrumenter {
 // Start web application.
 func (a *App) Start() error {
 	a.initLogger()
+
 	if err := a.initCache(); err != nil {
 		return err
 	}
+
 	if err := a.startTasks(); err != nil {
 		return err
 	}
+
+	a.initHTTPClient()
 
 	a.Log().Info(fmt.Sprintf("Starting %s...", a.String()))
 
 	return nil
 }
 
-// Stop application and its services
+// Stop application and its services.
 func (a *App) Stop() {
 	a.bgstop()
 

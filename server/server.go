@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type ServerOptions struct {
+type Options struct {
 	// AppName is the name of the application.
 	AppName string
 	// AppVer is the version of the application.
@@ -26,13 +26,14 @@ type ServerOptions struct {
 }
 
 // New returns new Azugo pre-configured core server with default configuration.
-func New(cmd *cobra.Command, opt ServerOptions) (*core.App, error) {
+func New(cmd *cobra.Command, opt Options) (*core.App, error) {
 	a := core.New()
 	a.AppName = opt.AppName
 	a.SetVersion(opt.AppVer, opt.AppBuiltWith)
 
 	// Support extended configuration.
 	var conf *config.Configuration
+
 	c := opt.Configuration
 	if c == nil {
 		conf = config.New()
@@ -42,6 +43,7 @@ func New(cmd *cobra.Command, opt ServerOptions) (*core.App, error) {
 	} else {
 		return nil, errors.New("configuration must implement Configurable interface")
 	}
+
 	a.SetConfig(cmd, conf)
 
 	// Load configuration

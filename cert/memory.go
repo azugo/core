@@ -16,44 +16,55 @@ func LoadPEMFromReader(r io.Reader, opt ...Option) ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+
 	opts := opts(opt...)
 
 	var cert, key []byte
+
 	for {
 		block, rest := pem.Decode(raw)
 		if block == nil {
 			break
 		}
-		if block.Type == PEMBlockCertificate {
+
+		switch block.Type {
+		case PEMBlockCertificate:
 			out := &bytes.Buffer{}
 			if err = pem.Encode(out, block); err != nil {
 				return nil, nil, err
 			}
+
 			cert = out.Bytes()
-		} else if block.Type == PEMBlockPrivateKey || block.Type == PEMBlockRSAPrivateKey || block.Type == PEMBlockECPrivateKey {
+		case PEMBlockPrivateKey, PEMBlockRSAPrivateKey, PEMBlockECPrivateKey:
 			out := &bytes.Buffer{}
 			if err = pem.Encode(out, block); err != nil {
 				return nil, nil, err
 			}
+
 			key = out.Bytes()
-		} else if block.Type == PEMBlockEncryptedPrivateKey {
+		case PEMBlockEncryptedPrivateKey:
 			if len(opts.Password) == 0 {
 				return nil, nil, errors.New("password required to decrypt private key")
 			}
+
 			p, err := pkcs8.ParsePKCS8PrivateKey(block.Bytes, opts.Password)
 			if err != nil {
 				return nil, nil, err
 			}
+
 			block, err = pemBlockForKey(p)
 			if err != nil {
 				return nil, nil, err
 			}
+
 			out := &bytes.Buffer{}
 			if err = pem.Encode(out, block); err != nil {
 				return nil, nil, err
 			}
+
 			key = out.Bytes()
 		}
+
 		raw = rest
 	}
 

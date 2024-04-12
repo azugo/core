@@ -12,25 +12,26 @@ import (
 )
 
 type cacheOptions struct {
-	Type               CacheType
+	Type               Type
 	TTL                time.Duration
 	ConnectionString   string
 	ConnectionPassword string
 	KeyPrefix          string
-	Loader             func(ctx context.Context, key string) (interface{}, error)
+	Loader             func(ctx context.Context, key string) (any, error)
 	Instrumenter       instrumenter.Instrumenter
 }
 
-// CacheOption is an option for the cache instance.
-type CacheOption interface {
-	applyCache(*cacheOptions)
+// Option for the cache instance.
+type Option interface {
+	applyCache(opt *cacheOptions)
 }
 
-func newCacheOptions(opts ...CacheOption) *cacheOptions {
+func newCacheOptions(opts ...Option) *cacheOptions {
 	opt := &cacheOptions{}
 	for _, o := range opts {
 		o.applyCache(opt)
 	}
+
 	return opt
 }
 
@@ -41,7 +42,7 @@ type itemOptions[T any] struct {
 
 // ItemOption is an option for the cached item.
 type ItemOption[T any] interface {
-	applyItem(*itemOptions[T])
+	applyItem(opt *itemOptions[T])
 }
 
 func newItemOptions[T any](opts ...ItemOption[T]) *itemOptions[T] {
@@ -49,22 +50,23 @@ func newItemOptions[T any](opts ...ItemOption[T]) *itemOptions[T] {
 	for _, o := range opts {
 		o.applyItem(opt)
 	}
+
 	return opt
 }
 
-// CacheType represents a cache type.
-type CacheType string
+// Type of a cache.
+type Type string
 
 const (
 	// MemoryCache store data in memory.
-	MemoryCache CacheType = "memory"
+	MemoryCache Type = "memory"
 	// RedisCache store data in Redis database.
-	RedisCache CacheType = "redis"
+	RedisCache Type = "redis"
 	// RedisClusterCache store data in Redis database cluster.
-	RedisClusterCache CacheType = "redis-cluster"
+	RedisClusterCache Type = "redis-cluster"
 )
 
-func (t CacheType) applyCache(c *cacheOptions) {
+func (t Type) applyCache(c *cacheOptions) {
 	c.Type = t
 }
 

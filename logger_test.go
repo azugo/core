@@ -3,27 +3,27 @@ package core
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/go-quicktest/qt"
 	"go.uber.org/zap"
 )
 
 func TestLogFields(t *testing.T) {
 	a, stop, logs, err := newTestApp()
-	require.NoError(t, err)
+	qt.Assert(t, qt.IsNil(err))
 	t.Cleanup(stop)
 
-	require.NoError(t, a.Start())
+	err = a.Start()
+	qt.Assert(t, qt.IsNil(err))
 
 	a.Log().Info("test", zap.String("field", "value"))
 
-	require.Len(t, logs.All(), 2)
+	qt.Assert(t, qt.HasLen(logs.All(), 2))
 	entry := logs.All()[1]
-	assert.Equal(t, "test", entry.Message)
-	assert.Equal(t, zap.InfoLevel, entry.Level)
+	qt.Check(t, qt.Equals(entry.Message, "test"))
+	qt.Check(t, qt.Equals(entry.Level, zap.InfoLevel))
 	fields := entry.ContextMap()
-	assert.Equal(t, "value", fields["field"])
-	assert.Equal(t, "Test", fields["service.name"])
-	assert.Equal(t, "1.0.0", fields["service.version"])
-	assert.Equal(t, "development", fields["service.environment"])
+	qt.Check(t, qt.Equals(fields["field"], "value"))
+	qt.Check(t, qt.Equals(fields["service.name"], "Test"))
+	qt.Check(t, qt.Equals(fields["service.version"], "1.0.0"))
+	qt.Check(t, qt.Equals(fields["service.environment"], "development"))
 }
