@@ -101,27 +101,21 @@ func NewClient(opt ...Option) Client {
 }
 
 func (c clientInstance) Do(req *Request, resp *Response) error {
-	finish := c.instrumenter.Observe(c.ctx, InstrumentationRequest, req, resp)
-
 	if c.ctx.Err() != nil {
-		finish(c.ctx.Err())
-
 		return c.ctx.Err()
 	}
 
 	for _, f := range c.reqMod {
 		if err := f(c.ctx, req); err != nil {
-			finish(err)
-
 			return err
 		}
 
 		if c.ctx.Err() != nil {
-			finish(c.ctx.Err())
-
 			return c.ctx.Err()
 		}
 	}
+
+	finish := c.instrumenter.Observe(c.ctx, InstrumentationRequest, req, resp)
 
 	err := c.c.Do(req.Request, resp.Response)
 
@@ -131,21 +125,17 @@ func (c clientInstance) Do(req *Request, resp *Response) error {
 		return c.ctx.Err()
 	}
 
+	finish(err)
+
 	for _, f := range c.respMod {
 		if e := f(c.ctx, resp, err); e != nil {
-			finish(e)
-
 			return e
 		}
 
 		if c.ctx.Err() != nil {
-			finish(c.ctx.Err())
-
 			return c.ctx.Err()
 		}
 	}
-
-	finish(err)
 
 	return err
 }
@@ -186,6 +176,18 @@ func (c clientInstance) WithConfiguration(name string) (Client, error) {
 	}
 
 	return c.WithBaseURI(cl.BaseURI), nil
+}
+
+// InstrRequest returns request and response if the operation is HTTP client request event.
+func InstrRequest(op string, args ...any) (*Request, *Response, bool) {
+	if op != InstrumentationRequest || len(args) != 2 {
+		return nil, nil, false
+	}
+
+	req, ok1 := args[0].(*Request)
+	resp, ok2 := args[1].(*Response)
+
+	return req, resp, ok1 && ok2
 }
 
 func init() {
