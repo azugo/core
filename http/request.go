@@ -56,6 +56,11 @@ func (r Request) SetRequestURI(uri string) error {
 	return nil
 }
 
+// BaseURI returns the base URI of the client.
+func (r Request) BaseURI() string {
+	return r.client.BaseURI()
+}
+
 // RequestOption is a functional option for configuring the HTTP request.
 type RequestOption interface {
 	apply(r *Request)
