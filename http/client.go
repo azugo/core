@@ -28,26 +28,26 @@ const (
 type Client interface {
 	WithConfiguration(name string) (Client, error)
 	WithContext(ctx context.Context) Client
-	WithBaseURI(uri string) Client
+	WithBaseURL(url string) Client
 
 	UserAgent() string
-	BaseURI() string
+	BaseURL() string
 
 	NewRequest() *Request
 	NewResponse() *Response
 
 	Do(req *Request, resp *Response) error
-	Get(uri string, opt ...RequestOption) ([]byte, error)
-	GetJSON(uri string, v any, opt ...RequestOption) error
-	Post(uri string, body []byte, opt ...RequestOption) ([]byte, error)
-	PostJSON(uri string, body, v any, opt ...RequestOption) error
-	PostForm(uri string, form map[string][]string, opt ...RequestOption) ([]byte, error)
-	PostMultipartForm(uri string, form *multipart.Form, opt ...RequestOption) ([]byte, error)
-	Put(uri string, body []byte, opt ...RequestOption) ([]byte, error)
-	PutJSON(uri string, body, v any, opt ...RequestOption) error
-	Patch(uri string, body []byte, opt ...RequestOption) ([]byte, error)
-	PatchJSON(uri string, body, v any, opt ...RequestOption) error
-	Delete(uri string, opt ...RequestOption) error
+	Get(url string, opt ...RequestOption) ([]byte, error)
+	GetJSON(url string, v any, opt ...RequestOption) error
+	Post(url string, body []byte, opt ...RequestOption) ([]byte, error)
+	PostJSON(url string, body, v any, opt ...RequestOption) error
+	PostForm(url string, form map[string][]string, opt ...RequestOption) ([]byte, error)
+	PostMultipartForm(url string, form *multipart.Form, opt ...RequestOption) ([]byte, error)
+	Put(url string, body []byte, opt ...RequestOption) ([]byte, error)
+	PutJSON(url string, body, v any, opt ...RequestOption) error
+	Patch(url string, body []byte, opt ...RequestOption) ([]byte, error)
+	PatchJSON(url string, body, v any, opt ...RequestOption) error
+	Delete(url string, opt ...RequestOption) error
 }
 
 type client struct {
@@ -63,7 +63,7 @@ type client struct {
 
 type clientInstance struct {
 	*client
-	baseURI string
+	baseURL string
 	ctx     context.Context
 }
 
@@ -95,7 +95,7 @@ func NewClient(opt ...Option) Client {
 			config:       opts.Configuration,
 			instrumenter: opts.Instrumenter,
 		},
-		baseURI: opts.BaseURI,
+		baseURL: opts.BaseURL,
 		ctx:     opts.Context,
 	}
 }
@@ -145,25 +145,25 @@ func (c clientInstance) UserAgent() string {
 	return c.c.Name
 }
 
-// BaseURI returns client base URI.
-func (c clientInstance) BaseURI() string {
-	return c.baseURI
+// BaseURL returns client base URL.
+func (c clientInstance) BaseURL() string {
+	return c.baseURL
 }
 
 // WithModifiers returns a new client with specified context.
 func (c clientInstance) WithContext(ctx context.Context) Client {
 	return &clientInstance{
 		client:  c.client,
-		baseURI: c.baseURI,
+		baseURL: c.baseURL,
 		ctx:     ctx,
 	}
 }
 
-// WithBaseURI returns a new client with specified base URI.
-func (c clientInstance) WithBaseURI(uri string) Client {
+// WithBaseURL returns a new client with specified base URL.
+func (c clientInstance) WithBaseURL(url string) Client {
 	return &clientInstance{
 		client:  c.client,
-		baseURI: uri,
+		baseURL: url,
 		ctx:     c.ctx,
 	}
 }
@@ -175,7 +175,7 @@ func (c clientInstance) WithConfiguration(name string) (Client, error) {
 		return nil, fmt.Errorf("client %q not found", name)
 	}
 
-	return c.WithBaseURI(cl.BaseURI), nil
+	return c.WithBaseURL(cl.BaseURL), nil
 }
 
 // InstrRequest returns request and response if the operation is HTTP client request event.

@@ -10,7 +10,7 @@ func main() {
 	cfg := &http.Configuration{
 		Clients: map[string]http.NamedClient{
 			"example": {
-				BaseURI: "https://example.com",
+				BaseURL: "https://example.com",
 			},
 		},
 	}
@@ -19,9 +19,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
 	resp, err := c.Get("/")
 	if err != nil {
 		panic(err)
 	}
+
 	fmt.Println(string(resp))
 }

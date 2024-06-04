@@ -36,7 +36,7 @@ func TestGetRequest(t *testing.T) {
 	s.Start()
 	defer s.Stop()
 
-	c := NewClient(s.DialContext(), BaseURI("http://localhost:8080"))
+	c := NewClient(s.DialContext(), BaseURL("http://localhost:8080"))
 	body, err := c.Get("/", WithQueryArg("name", "Test"), WithQueryArg("name", "John Doe", true))
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(string(body), "Hello World"))
@@ -422,7 +422,7 @@ func TestClientRequestReuse(t *testing.T) {
 	s.Start()
 	defer s.Stop()
 
-	c := NewClient(s.DialContext(), BaseURI("http://localhost:8080"))
+	c := NewClient(s.DialContext(), BaseURL("http://localhost:8080"))
 	body, err := c.Get("/")
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(string(body), ""))
@@ -443,7 +443,7 @@ func TestClientWithConfiguration(t *testing.T) {
 	cfg := &Configuration{
 		Clients: map[string]NamedClient{
 			"test": {
-				BaseURI: "http://localhost:8080",
+				BaseURL: "http://localhost:8080",
 			},
 		},
 	}

@@ -6,7 +6,7 @@ import (
 
 // NamedClient represents the configuration for the named client instance.
 type NamedClient struct {
-	BaseURI string `mapstructure:"base_uri" validate:"required http_url"`
+	BaseURL string `mapstructure:"base_url" validate:"required http_url"`
 }
 
 // Configuration represents the configuration for the HTTP client.

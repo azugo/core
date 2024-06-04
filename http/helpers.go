@@ -33,10 +33,10 @@ func (c clientInstance) call(req *Request) ([]byte, error) {
 	return body, nil
 }
 
-// Get performs a GET request to the specified URI.
-func (c clientInstance) Get(uri string, opt ...RequestOption) ([]byte, error) {
+// Get performs a GET request to the specified URL.
+func (c clientInstance) Get(url string, opt ...RequestOption) ([]byte, error) {
 	req := c.NewRequest()
-	if err := req.SetRequestURI(uri); err != nil {
+	if err := req.SetRequestURL(url); err != nil {
 		return nil, err
 	}
 
@@ -45,9 +45,9 @@ func (c clientInstance) Get(uri string, opt ...RequestOption) ([]byte, error) {
 	return c.call(req)
 }
 
-// GetJSON performs a GET request to the specified URI and unmarshals the response into v.
-func (c clientInstance) GetJSON(uri string, v any, opt ...RequestOption) error {
-	resp, err := c.Get(uri, opt...)
+// GetJSON performs a GET request to the specified URL and unmarshals the response into v.
+func (c clientInstance) GetJSON(url string, v any, opt ...RequestOption) error {
+	resp, err := c.Get(url, opt...)
 	if err != nil {
 		return err
 	}
@@ -59,12 +59,12 @@ func (c clientInstance) GetJSON(uri string, v any, opt ...RequestOption) error {
 	return nil
 }
 
-// Post performs a POST request to the specified URI.
+// Post performs a POST request to the specified URL.
 //
 // From this point onward the body argument must not be changed.
-func (c clientInstance) Post(uri string, body []byte, opt ...RequestOption) ([]byte, error) {
+func (c clientInstance) Post(url string, body []byte, opt ...RequestOption) ([]byte, error) {
 	req := c.NewRequest()
-	if err := req.SetRequestURI(uri); err != nil {
+	if err := req.SetRequestURL(url); err != nil {
 		return nil, err
 	}
 
@@ -76,8 +76,8 @@ func (c clientInstance) Post(uri string, body []byte, opt ...RequestOption) ([]b
 	return c.call(req)
 }
 
-// PostJSON performs a POST request to the specified URI and unmarshals the response into v.
-func (c clientInstance) PostJSON(uri string, body, v any, opt ...RequestOption) error {
+// PostJSON performs a POST request to the specified URL and unmarshals the response into v.
+func (c clientInstance) PostJSON(url string, body, v any, opt ...RequestOption) error {
 	reqBody, err := json.MarshalContext(c.ctx, body)
 	if err != nil {
 		return err
@@ -85,7 +85,7 @@ func (c clientInstance) PostJSON(uri string, body, v any, opt ...RequestOption) 
 
 	opt = append([]RequestOption{WithHeader(fasthttp.HeaderContentType, "application/json")}, opt...)
 
-	resp, err := c.Post(uri, reqBody, opt...)
+	resp, err := c.Post(url, reqBody, opt...)
 	if err != nil {
 		return err
 	}
@@ -97,8 +97,8 @@ func (c clientInstance) PostJSON(uri string, body, v any, opt ...RequestOption) 
 	return nil
 }
 
-// PostForm performs a POST request to the specified URI with the specified form values encoded with URL encoding.
-func (c clientInstance) PostForm(uri string, form map[string][]string, opt ...RequestOption) ([]byte, error) {
+// PostForm performs a POST request to the specified URL with the specified form values encoded with URL encoding.
+func (c clientInstance) PostForm(url string, form map[string][]string, opt ...RequestOption) ([]byte, error) {
 	args := fasthttp.AcquireArgs()
 	defer fasthttp.ReleaseArgs(args)
 
@@ -110,15 +110,15 @@ func (c clientInstance) PostForm(uri string, form map[string][]string, opt ...Re
 
 	opt = append([]RequestOption{WithHeader(fasthttp.HeaderContentType, "application/x-www-form-urlencoded")}, opt...)
 
-	return c.Post(uri, args.QueryString(), opt...)
+	return c.Post(url, args.QueryString(), opt...)
 }
 
-// PostMultipartForm performs a POST request to the specified URI with the specified multipart form values and files.
-func (c clientInstance) PostMultipartForm(uri string, form *multipart.Form, opt ...RequestOption) ([]byte, error) {
+// PostMultipartForm performs a POST request to the specified URL with the specified multipart form values and files.
+func (c clientInstance) PostMultipartForm(url string, form *multipart.Form, opt ...RequestOption) ([]byte, error) {
 	req := c.NewRequest()
 	req.Header.SetMethod(fasthttp.MethodPost)
 
-	if err := req.SetRequestURI(uri); err != nil {
+	if err := req.SetRequestURL(url); err != nil {
 		return nil, err
 	}
 
@@ -146,10 +146,10 @@ func (c clientInstance) PostMultipartForm(uri string, form *multipart.Form, opt 
 	return c.call(req)
 }
 
-// Put performs a PUT request to the specified URI.
-func (c clientInstance) Put(uri string, body []byte, opt ...RequestOption) ([]byte, error) {
+// Put performs a PUT request to the specified URL.
+func (c clientInstance) Put(url string, body []byte, opt ...RequestOption) ([]byte, error) {
 	req := c.NewRequest()
-	if err := req.SetRequestURI(uri); err != nil {
+	if err := req.SetRequestURL(url); err != nil {
 		return nil, err
 	}
 
@@ -161,8 +161,8 @@ func (c clientInstance) Put(uri string, body []byte, opt ...RequestOption) ([]by
 	return c.call(req)
 }
 
-// PutJSON performs a PUT request to the specified URI and unmarshals the response into v.
-func (c clientInstance) PutJSON(uri string, body, v any, opt ...RequestOption) error {
+// PutJSON performs a PUT request to the specified URL and unmarshals the response into v.
+func (c clientInstance) PutJSON(url string, body, v any, opt ...RequestOption) error {
 	reqBody, err := json.MarshalContext(c.ctx, body)
 	if err != nil {
 		return err
@@ -170,7 +170,7 @@ func (c clientInstance) PutJSON(uri string, body, v any, opt ...RequestOption) e
 
 	opt = append([]RequestOption{WithHeader(fasthttp.HeaderContentType, "application/json")}, opt...)
 
-	resp, err := c.Put(uri, reqBody, opt...)
+	resp, err := c.Put(url, reqBody, opt...)
 	if err != nil {
 		return err
 	}
@@ -182,10 +182,10 @@ func (c clientInstance) PutJSON(uri string, body, v any, opt ...RequestOption) e
 	return nil
 }
 
-// Patch performs a PATCH request to the specified URI.
-func (c clientInstance) Patch(uri string, body []byte, opt ...RequestOption) ([]byte, error) {
+// Patch performs a PATCH request to the specified URL.
+func (c clientInstance) Patch(url string, body []byte, opt ...RequestOption) ([]byte, error) {
 	req := c.NewRequest()
-	if err := req.SetRequestURI(uri); err != nil {
+	if err := req.SetRequestURL(url); err != nil {
 		return nil, err
 	}
 
@@ -197,8 +197,8 @@ func (c clientInstance) Patch(uri string, body []byte, opt ...RequestOption) ([]
 	return c.call(req)
 }
 
-// PatchJSON performs a PATCH request to the specified URI and unmarshals the response into v.
-func (c clientInstance) PatchJSON(uri string, body, v any, opt ...RequestOption) error {
+// PatchJSON performs a PATCH request to the specified URL and unmarshals the response into v.
+func (c clientInstance) PatchJSON(url string, body, v any, opt ...RequestOption) error {
 	reqBody, err := json.MarshalContext(c.ctx, body)
 	if err != nil {
 		return err
@@ -206,7 +206,7 @@ func (c clientInstance) PatchJSON(uri string, body, v any, opt ...RequestOption)
 
 	opt = append([]RequestOption{WithHeader(fasthttp.HeaderContentType, "application/json")}, opt...)
 
-	resp, err := c.Patch(uri, reqBody, opt...)
+	resp, err := c.Patch(url, reqBody, opt...)
 	if err != nil {
 		return err
 	}
@@ -218,10 +218,10 @@ func (c clientInstance) PatchJSON(uri string, body, v any, opt ...RequestOption)
 	return nil
 }
 
-// Delete performs a DELETE request to the specified URI.
-func (c clientInstance) Delete(uri string, opt ...RequestOption) error {
+// Delete performs a DELETE request to the specified URL.
+func (c clientInstance) Delete(url string, opt ...RequestOption) error {
 	req := c.NewRequest()
-	if err := req.SetRequestURI(uri); err != nil {
+	if err := req.SetRequestURL(url); err != nil {
 		return err
 	}
 

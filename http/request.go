@@ -42,23 +42,23 @@ func (c clientInstance) ReleaseRequest(req *Request) {
 	c.requestPool.Put(req)
 }
 
-// SetRequestURI sets the request URI.
-func (r Request) SetRequestURI(uri string) error {
-	if baseURI := r.client.BaseURI(); baseURI != "" && !strings.Contains(uri, "://") {
+// SetRequestURL sets the request URL.
+func (r Request) SetRequestURL(u string) error {
+	if baseURL := r.client.BaseURL(); baseURL != "" && !strings.Contains(u, "://") {
 		var err error
-		if uri, err = url.JoinPath(baseURI, uri); err != nil {
+		if u, err = url.JoinPath(baseURL, u); err != nil {
 			return err
 		}
 	}
 
-	r.Request.SetRequestURI(uri)
+	r.Request.SetRequestURI(u)
 
 	return nil
 }
 
-// BaseURI returns the base URI of the client.
-func (r Request) BaseURI() string {
-	return r.client.BaseURI()
+// BaseURL returns the base URL of the client.
+func (r Request) BaseURL() string {
+	return r.client.BaseURL()
 }
 
 // RequestOption is a functional option for configuring the HTTP request.

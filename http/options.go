@@ -16,7 +16,7 @@ type options struct {
 	Context           context.Context
 	Instrumenter      instrumenter.Instrumenter
 	UserAgent         string
-	BaseURI           string
+	BaseURL           string
 	RequestModifiers  []RequestFunc
 	ResponseModifiers []ResponseFunc
 	Configuration     *Configuration
@@ -67,11 +67,11 @@ func (f DialContextFunc) apply(o *options) {
 	}
 }
 
-// BaseURI sets the base URI for the HTTP client requests.
-type BaseURI string
+// BaseURL sets the base URL for the HTTP client requests.
+type BaseURL string
 
-func (u BaseURI) apply(o *options) {
-	o.BaseURI = string(u)
+func (u BaseURL) apply(o *options) {
+	o.BaseURL = string(u)
 }
 
 // UserAgent sets the user agent for the HTTP client requests.
