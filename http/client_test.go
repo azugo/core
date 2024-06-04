@@ -20,6 +20,11 @@ func TestUserAgent(t *testing.T) {
 func TestGetRequest(t *testing.T) {
 	s := newTestHttpServer()
 	s.Handler = func(ctx *fasthttp.RequestCtx) {
+		if string(ctx.UserAgent()) != "Azugo/dev" {
+			ctx.SetStatusCode(fasthttp.StatusTeapot)
+			return
+		}
+
 		if string(ctx.Request.Header.Method()) != fasthttp.MethodGet {
 			ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
 			return

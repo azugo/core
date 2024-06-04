@@ -18,15 +18,19 @@ type Request struct {
 // The returned request must be released after use by calling ReleaseRequest.
 func (c clientInstance) NewRequest() *Request {
 	v := c.requestPool.Get()
+
+	freq := fasthttp.AcquireRequest()
+	freq.Header.SetUserAgent(c.UserAgent())
+
 	if v == nil {
 		return &Request{
-			Request: fasthttp.AcquireRequest(),
+			Request: freq,
 			client:  c,
 		}
 	}
 
 	req, _ := v.(*Request)
-	req.Request = fasthttp.AcquireRequest()
+	req.Request = freq
 	req.client = c
 
 	return req
