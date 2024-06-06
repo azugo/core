@@ -33,8 +33,18 @@ type Client interface {
 	UserAgent() string
 	BaseURL() string
 
+	// NewRequest creates a new HTTP request.
+	//
+	// The returned request must be released after use by calling ReleaseRequest.
 	NewRequest() *Request
+	// NewResponse creates a new HTTP response.
+	//
+	// The returned response must be released after use by calling ReleaseResponse.
 	NewResponse() *Response
+	// ReleaseRequest releases the HTTP request back to pool.
+	ReleaseRequest(req *Request)
+	// ReleaseResponse releases the HTTP response back to pool.
+	ReleaseResponse(resp *Response)
 
 	Do(req *Request, resp *Response) error
 	Get(url string, opt ...RequestOption) ([]byte, error)
