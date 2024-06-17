@@ -3,6 +3,7 @@ package http
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"mime/multipart"
 	"strings"
 	"testing"
@@ -11,6 +12,38 @@ import (
 	"github.com/go-quicktest/qt"
 	"github.com/valyala/fasthttp"
 )
+
+type date struct {
+	time.Time
+}
+
+func (t date) String() string {
+	y, m, d := t.Date()
+	return fmt.Sprintf("%04d-%02d-%02d", y, int(m), d)
+}
+
+func (t date) MarshalJSON() ([]byte, error) {
+	return []byte(t.Format(`"2006-01-02"`)), nil
+}
+
+func (t *date) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
+
+	tt, err := time.Parse(`"2006-01-02"`, string(data))
+	if err != nil {
+		// If parsing as pure date fails, try parsing as timestamp
+		tt, err = time.Parse(fmt.Sprintf(`"%s"`, time.RFC3339Nano), string(data))
+		if err != nil {
+			return err
+		}
+	}
+
+	*t = date{tt}
+
+	return nil
+}
 
 func TestUserAgent(t *testing.T) {
 	c := NewClient()
@@ -56,7 +89,7 @@ func TestGetJSONRequest(t *testing.T) {
 		}
 
 		ctx.SetContentTypeBytes(strContentTypeJSON)
-		ctx.SetBodyString(`{"message":"Hello World"}`)
+		ctx.SetBodyString(`{"date":"2023-12-01", "message":"Hello World"}`)
 		ctx.SetStatusCode(fasthttp.StatusOK)
 	}
 	s.Start()
@@ -65,11 +98,13 @@ func TestGetJSONRequest(t *testing.T) {
 	c := NewClient(s.DialContext())
 
 	ret := struct {
+		Date    *date  `json:"date"`
 		Message string `json:"message"`
 	}{}
 
 	err := c.GetJSON("http://localhost:8080", &ret)
 	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(ret.Date.String(), "2023-12-01"))
 	qt.Check(t, qt.Equals(ret.Message, "Hello World"))
 }
 

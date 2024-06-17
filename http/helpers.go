@@ -53,7 +53,7 @@ func (c clientInstance) GetJSON(url string, v any, opt ...RequestOption) error {
 	}
 
 	if len(resp) > 0 {
-		return json.UnmarshalContext(c.ctx, resp, v)
+		return json.Unmarshal(resp, v)
 	}
 
 	return nil
@@ -78,7 +78,7 @@ func (c clientInstance) Post(url string, body []byte, opt ...RequestOption) ([]b
 
 // PostJSON performs a POST request to the specified URL and unmarshals the response into v.
 func (c clientInstance) PostJSON(url string, body, v any, opt ...RequestOption) error {
-	reqBody, err := json.MarshalContext(c.ctx, body)
+	reqBody, err := json.Marshal(body)
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func (c clientInstance) PostJSON(url string, body, v any, opt ...RequestOption) 
 	}
 
 	if len(resp) > 0 {
-		return json.UnmarshalContext(c.ctx, resp, v)
+		return json.Unmarshal(resp, v)
 	}
 
 	return nil
@@ -163,7 +163,7 @@ func (c clientInstance) Put(url string, body []byte, opt ...RequestOption) ([]by
 
 // PutJSON performs a PUT request to the specified URL and unmarshals the response into v.
 func (c clientInstance) PutJSON(url string, body, v any, opt ...RequestOption) error {
-	reqBody, err := json.MarshalContext(c.ctx, body)
+	reqBody, err := json.Marshal(body)
 	if err != nil {
 		return err
 	}
@@ -176,7 +176,7 @@ func (c clientInstance) PutJSON(url string, body, v any, opt ...RequestOption) e
 	}
 
 	if len(resp) > 0 {
-		return json.UnmarshalContext(c.ctx, resp, v)
+		return json.Unmarshal(resp, v)
 	}
 
 	return nil
@@ -199,7 +199,7 @@ func (c clientInstance) Patch(url string, body []byte, opt ...RequestOption) ([]
 
 // PatchJSON performs a PATCH request to the specified URL and unmarshals the response into v.
 func (c clientInstance) PatchJSON(url string, body, v any, opt ...RequestOption) error {
-	reqBody, err := json.MarshalContext(c.ctx, body)
+	reqBody, err := json.Marshal(body)
 	if err != nil {
 		return err
 	}
@@ -212,7 +212,7 @@ func (c clientInstance) PatchJSON(url string, body, v any, opt ...RequestOption)
 	}
 
 	if len(resp) > 0 {
-		return json.UnmarshalContext(c.ctx, resp, v)
+		return json.Unmarshal(resp, v)
 	}
 
 	return nil
