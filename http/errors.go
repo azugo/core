@@ -41,24 +41,29 @@ func (e ErrorResponse) Error() string {
 // ResponseStatusCode is an interface that error can implement to return
 // status code that will be set for the response.
 type ResponseStatusCode interface {
+	// StatusCode to be set for the response.
 	StatusCode() int
 }
 
 // UnauthorizedError is an error that occurs when user is not authorized.
 type UnauthorizedError struct{}
 
-func (e UnauthorizedError) Error() string {
+func (UnauthorizedError) Error() string {
 	return "unauthorized"
+}
+
+func (UnauthorizedError) StatusCode() int {
+	return fasthttp.StatusUnauthorized
 }
 
 // ForbiddenError is an error that occurs when user access is denied.
 type ForbiddenError struct{}
 
-func (e ForbiddenError) Error() string {
+func (ForbiddenError) Error() string {
 	return "access forbidden"
 }
 
-func (e ForbiddenError) StatusCode() int {
+func (ForbiddenError) StatusCode() int {
 	return fasthttp.StatusForbidden
 }
 
@@ -75,6 +80,6 @@ func (e NotFoundError) Error() string {
 	return e.Resource + " not found"
 }
 
-func (e NotFoundError) StatusCode() int {
+func (NotFoundError) StatusCode() int {
 	return fasthttp.StatusNotFound
 }
