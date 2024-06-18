@@ -72,6 +72,10 @@ type RequestOption interface {
 
 func (r *Request) apply(opts []RequestOption) {
 	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+
 		opt.apply(r)
 	}
 }

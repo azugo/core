@@ -24,6 +24,10 @@ type options struct {
 
 func (o *options) apply(opts []Option) {
 	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+
 		opt.apply(o)
 	}
 }
