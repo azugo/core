@@ -60,6 +60,12 @@ type Client interface {
 	Delete(url string, opt ...RequestOption) error
 }
 
+// ClientProvider is the interface that provides HTTP client.
+type ClientProvider interface {
+	// HTTPClient returns HTTP client instance.
+	HTTPClient() Client
+}
+
 type client struct {
 	requestPool  sync.Pool
 	responsePool sync.Pool
