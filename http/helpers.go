@@ -10,7 +10,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func (c clientInstance) call(req *Request) ([]byte, error) {
+func (c client) call(req *Request) ([]byte, error) {
 	resp := c.NewResponse()
 	defer c.ReleaseResponse(resp)
 
@@ -34,7 +34,7 @@ func (c clientInstance) call(req *Request) ([]byte, error) {
 }
 
 // Get performs a GET request to the specified URL.
-func (c clientInstance) Get(url string, opt ...RequestOption) ([]byte, error) {
+func (c client) Get(url string, opt ...RequestOption) ([]byte, error) {
 	req := c.NewRequest()
 	if err := req.SetRequestURL(url); err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ func (c clientInstance) Get(url string, opt ...RequestOption) ([]byte, error) {
 }
 
 // GetJSON performs a GET request to the specified URL and unmarshals the response into v.
-func (c clientInstance) GetJSON(url string, v any, opt ...RequestOption) error {
+func (c client) GetJSON(url string, v any, opt ...RequestOption) error {
 	resp, err := c.Get(url, opt...)
 	if err != nil {
 		return err
@@ -62,7 +62,7 @@ func (c clientInstance) GetJSON(url string, v any, opt ...RequestOption) error {
 // Post performs a POST request to the specified URL.
 //
 // From this point onward the body argument must not be changed.
-func (c clientInstance) Post(url string, body []byte, opt ...RequestOption) ([]byte, error) {
+func (c client) Post(url string, body []byte, opt ...RequestOption) ([]byte, error) {
 	req := c.NewRequest()
 	if err := req.SetRequestURL(url); err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func (c clientInstance) Post(url string, body []byte, opt ...RequestOption) ([]b
 }
 
 // PostJSON performs a POST request to the specified URL and unmarshals the response into v.
-func (c clientInstance) PostJSON(url string, body, v any, opt ...RequestOption) error {
+func (c client) PostJSON(url string, body, v any, opt ...RequestOption) error {
 	reqBody, err := json.Marshal(body)
 	if err != nil {
 		return err
@@ -98,7 +98,7 @@ func (c clientInstance) PostJSON(url string, body, v any, opt ...RequestOption) 
 }
 
 // PostForm performs a POST request to the specified URL with the specified form values encoded with URL encoding.
-func (c clientInstance) PostForm(url string, form map[string][]string, opt ...RequestOption) ([]byte, error) {
+func (c client) PostForm(url string, form map[string][]string, opt ...RequestOption) ([]byte, error) {
 	args := fasthttp.AcquireArgs()
 	defer fasthttp.ReleaseArgs(args)
 
@@ -114,7 +114,7 @@ func (c clientInstance) PostForm(url string, form map[string][]string, opt ...Re
 }
 
 // PostMultipartForm performs a POST request to the specified URL with the specified multipart form values and files.
-func (c clientInstance) PostMultipartForm(url string, form *multipart.Form, opt ...RequestOption) ([]byte, error) {
+func (c client) PostMultipartForm(url string, form *multipart.Form, opt ...RequestOption) ([]byte, error) {
 	req := c.NewRequest()
 	req.Header.SetMethod(fasthttp.MethodPost)
 
@@ -147,7 +147,7 @@ func (c clientInstance) PostMultipartForm(url string, form *multipart.Form, opt 
 }
 
 // Put performs a PUT request to the specified URL.
-func (c clientInstance) Put(url string, body []byte, opt ...RequestOption) ([]byte, error) {
+func (c client) Put(url string, body []byte, opt ...RequestOption) ([]byte, error) {
 	req := c.NewRequest()
 	if err := req.SetRequestURL(url); err != nil {
 		return nil, err
@@ -162,7 +162,7 @@ func (c clientInstance) Put(url string, body []byte, opt ...RequestOption) ([]by
 }
 
 // PutJSON performs a PUT request to the specified URL and unmarshals the response into v.
-func (c clientInstance) PutJSON(url string, body, v any, opt ...RequestOption) error {
+func (c client) PutJSON(url string, body, v any, opt ...RequestOption) error {
 	reqBody, err := json.Marshal(body)
 	if err != nil {
 		return err
@@ -183,7 +183,7 @@ func (c clientInstance) PutJSON(url string, body, v any, opt ...RequestOption) e
 }
 
 // Patch performs a PATCH request to the specified URL.
-func (c clientInstance) Patch(url string, body []byte, opt ...RequestOption) ([]byte, error) {
+func (c client) Patch(url string, body []byte, opt ...RequestOption) ([]byte, error) {
 	req := c.NewRequest()
 	if err := req.SetRequestURL(url); err != nil {
 		return nil, err
@@ -198,7 +198,7 @@ func (c clientInstance) Patch(url string, body []byte, opt ...RequestOption) ([]
 }
 
 // PatchJSON performs a PATCH request to the specified URL and unmarshals the response into v.
-func (c clientInstance) PatchJSON(url string, body, v any, opt ...RequestOption) error {
+func (c client) PatchJSON(url string, body, v any, opt ...RequestOption) error {
 	reqBody, err := json.Marshal(body)
 	if err != nil {
 		return err
@@ -219,7 +219,7 @@ func (c clientInstance) PatchJSON(url string, body, v any, opt ...RequestOption)
 }
 
 // Delete performs a DELETE request to the specified URL.
-func (c clientInstance) Delete(url string, opt ...RequestOption) error {
+func (c client) Delete(url string, opt ...RequestOption) error {
 	req := c.NewRequest()
 	if err := req.SetRequestURL(url); err != nil {
 		return err

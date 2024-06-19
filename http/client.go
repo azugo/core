@@ -66,19 +66,19 @@ type ClientProvider interface {
 	HTTPClient() Client
 }
 
-type client struct {
+type clientOpts struct {
 	requestPool  sync.Pool
 	responsePool sync.Pool
 	bufferPool   bytebufferpool.Pool
-	c            *fasthttp.Client
 	reqMod       []RequestFunc
 	respMod      []ResponseFunc
 	config       *Configuration
 	instrumenter instrumenter.Instrumenter
 }
 
-type clientInstance struct {
-	*client
+type client struct {
+	*clientOpts
+	c       *fasthttp.Client
 	baseURL string
 	ctx     context.Context
 }
@@ -99,24 +99,24 @@ func NewClient(opt ...Option) Client {
 		opts.UserAgent = defaultUserAgent
 	}
 
-	return &clientInstance{
-		client: &client{
-			c: &fasthttp.Client{
-				Name:      opts.UserAgent,
-				TLSConfig: opts.TLSConfig,
-				Dial:      opts.Dial,
-			},
+	return &client{
+		clientOpts: &clientOpts{
 			reqMod:       opts.RequestModifiers,
 			respMod:      opts.ResponseModifiers,
 			config:       opts.Configuration,
 			instrumenter: opts.Instrumenter,
+		},
+		c: &fasthttp.Client{
+			Name:      opts.UserAgent,
+			TLSConfig: opts.TLSConfig,
+			Dial:      opts.Dial,
 		},
 		baseURL: opts.BaseURL,
 		ctx:     opts.Context,
 	}
 }
 
-func (c clientInstance) Do(req *Request, resp *Response) error {
+func (c client) Do(req *Request, resp *Response) error {
 	if c.ctx.Err() != nil {
 		return c.ctx.Err()
 	}
@@ -157,41 +157,79 @@ func (c clientInstance) Do(req *Request, resp *Response) error {
 }
 
 // UserAgent returns client default user agent.
-func (c clientInstance) UserAgent() string {
+func (c client) UserAgent() string {
 	return c.c.Name
 }
 
 // BaseURL returns client base URL.
-func (c clientInstance) BaseURL() string {
+func (c client) BaseURL() string {
 	return c.baseURL
 }
 
 // WithModifiers returns a new client with specified context.
-func (c clientInstance) WithContext(ctx context.Context) Client {
-	return &clientInstance{
-		client:  c.client,
-		baseURL: c.baseURL,
-		ctx:     ctx,
+func (c client) WithContext(ctx context.Context) Client {
+	return &client{
+		clientOpts: c.clientOpts,
+		baseURL:    c.baseURL,
+		c:          c.c,
+		ctx:        ctx,
 	}
 }
 
 // WithBaseURL returns a new client with specified base URL.
-func (c clientInstance) WithBaseURL(url string) Client {
-	return &clientInstance{
-		client:  c.client,
-		baseURL: url,
-		ctx:     c.ctx,
+func (c client) WithBaseURL(url string) Client {
+	return &client{
+		clientOpts: c.clientOpts,
+		baseURL:    url,
+		c:          c.c,
+		ctx:        c.ctx,
 	}
 }
 
 // WithConfiguration returns a new client with specific named configuration.
-func (c clientInstance) WithConfiguration(name string) (Client, error) {
+func (c client) WithConfiguration(name string) (Client, error) {
 	cl, ok := c.config.Clients[name]
 	if !ok {
 		return nil, fmt.Errorf("client %q not found", name)
 	}
 
 	return c.WithBaseURL(cl.BaseURL), nil
+}
+
+// WithOptions returns a new client with additional options applied.
+func (c client) WithOptions(opt ...Option) Client {
+	opts := &options{
+		RequestModifiers:  c.reqMod,
+		ResponseModifiers: c.respMod,
+		Configuration:     c.config,
+		Context:           c.ctx,
+		Instrumenter:      c.instrumenter,
+		TLSConfig:         c.c.TLSConfig,
+		Dial:              c.c.Dial,
+		UserAgent:         c.c.Name,
+		BaseURL:           c.baseURL,
+	}
+	opts.apply(opt)
+
+	if opts.UserAgent == "" {
+		opts.UserAgent = defaultUserAgent
+	}
+
+	return &client{
+		clientOpts: &clientOpts{
+			reqMod:       opts.RequestModifiers,
+			respMod:      opts.ResponseModifiers,
+			config:       opts.Configuration,
+			instrumenter: opts.Instrumenter,
+		},
+		c: &fasthttp.Client{
+			Name:      opts.UserAgent,
+			TLSConfig: opts.TLSConfig,
+			Dial:      opts.Dial,
+		},
+		baseURL: opts.BaseURL,
+		ctx:     opts.Context,
+	}
 }
 
 // InstrRequest returns request and response if the operation is HTTP client request event.

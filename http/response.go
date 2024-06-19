@@ -61,7 +61,7 @@ func (r Response) Error() error {
 // NewResponse returns a new response instance.
 //
 // The returned response must be released after use by calling ReleaseResponse.
-func (c *client) NewResponse() *Response {
+func (c client) NewResponse() *Response {
 	v := c.responsePool.Get()
 	if v == nil {
 		return &Response{
@@ -76,7 +76,7 @@ func (c *client) NewResponse() *Response {
 }
 
 // ReleaseResponse releases the response instance.
-func (c *client) ReleaseResponse(res *Response) {
+func (c client) ReleaseResponse(res *Response) {
 	r := res.Response
 	res.Response = nil
 

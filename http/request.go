@@ -16,7 +16,7 @@ type Request struct {
 // NewRequest creates a new HTTP request.
 //
 // The returned request must be released after use by calling ReleaseRequest.
-func (c clientInstance) NewRequest() *Request {
+func (c client) NewRequest() *Request {
 	v := c.requestPool.Get()
 
 	freq := fasthttp.AcquireRequest()
@@ -37,7 +37,7 @@ func (c clientInstance) NewRequest() *Request {
 }
 
 // ReleaseRequest releases the HTTP request back to pool.
-func (c clientInstance) ReleaseRequest(req *Request) {
+func (c client) ReleaseRequest(req *Request) {
 	r := req.Request
 	req.Request = nil
 	req.client = nil
