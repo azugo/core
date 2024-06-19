@@ -26,11 +26,18 @@ const (
 
 // Client is the interface that provides HTTP client.
 type Client interface {
+	// WithConfiguration returns a new client with specific named configuration.
 	WithConfiguration(name string) (Client, error)
+	// WithContext returns a new client with specified context.
 	WithContext(ctx context.Context) Client
+	// WithBaseURL returns a new client with specified base URL.
 	WithBaseURL(url string) Client
+	// WithOptions returns a new client with additional options applied.
+	WithOptions(opt ...Option) Client
 
+	// UserAgent returns client user agent.
 	UserAgent() string
+	// BaseURL returns client base URL.
 	BaseURL() string
 
 	// NewRequest creates a new HTTP request.
@@ -46,17 +53,29 @@ type Client interface {
 	// ReleaseResponse releases the HTTP response back to pool.
 	ReleaseResponse(resp *Response)
 
+	// Do sends an HTTP request and returns an HTTP response.
 	Do(req *Request, resp *Response) error
+	// Get sends an HTTP GET request and returns an HTTP response body.
 	Get(url string, opt ...RequestOption) ([]byte, error)
+	// GetJSON sends an HTTP GET request and unmarshals the response body into v.
 	GetJSON(url string, v any, opt ...RequestOption) error
+	// Head sends an HTTP POST request and returns an HTTP response body.
 	Post(url string, body []byte, opt ...RequestOption) ([]byte, error)
+	// PostJSON sends an HTTP POST request and unmarshals response body into v.
 	PostJSON(url string, body, v any, opt ...RequestOption) error
+	// PostForm sends an HTTP POST request with form data and returns an HTTP response body.
 	PostForm(url string, form map[string][]string, opt ...RequestOption) ([]byte, error)
+	// PostMultipartForm sends an HTTP POST request with multipart form data and returns an HTTP response body.
 	PostMultipartForm(url string, form *multipart.Form, opt ...RequestOption) ([]byte, error)
+	// Put sends an HTTP PUT request and returns an HTTP response body.
 	Put(url string, body []byte, opt ...RequestOption) ([]byte, error)
+	// PutJSON sends an HTTP PUT request and unmarshals response body into v.
 	PutJSON(url string, body, v any, opt ...RequestOption) error
+	// Patch sends an HTTP PATCH request and returns an HTTP response body.
 	Patch(url string, body []byte, opt ...RequestOption) ([]byte, error)
+	// PatchJSON sends an HTTP PATCH request and unmarshals response body into v.
 	PatchJSON(url string, body, v any, opt ...RequestOption) error
+	// Delete sends an HTTP DELETE request.
 	Delete(url string, opt ...RequestOption) error
 }
 
