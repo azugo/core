@@ -24,9 +24,7 @@ func CreateDevPEM(dns ...string) ([]byte, any, error) {
 		return nil, nil, err
 	}
 
-	max := big.NewInt(0).Exp(big.NewInt(2), big.NewInt(130), nil)
-
-	serial, err := rand.Int(rand.Reader, max)
+	serial, err := rand.Int(rand.Reader, big.NewInt(0).Exp(big.NewInt(2), big.NewInt(130), nil))
 	if err != nil {
 		return nil, nil, err
 	}
