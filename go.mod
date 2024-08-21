@@ -9,12 +9,12 @@ require (
 	github.com/goccy/go-json v0.10.3
 	github.com/lafriks/pkcs8 v1.2.0
 	github.com/mattn/go-colorable v0.1.13
-	github.com/redis/go-redis/v9 v9.5.3
+	github.com/redis/go-redis/v9 v9.6.1
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/valyala/bytebufferpool v1.0.0
 	github.com/valyala/fasthttp v1.55.0
-	go.elastic.co/ecszap v1.0.2
+	go.elastic.co/ecszap v1.0.3
 	go.uber.org/zap v1.27.0
 )
 
