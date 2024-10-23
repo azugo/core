@@ -2,7 +2,9 @@ package http
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"runtime/debug"
 	"strings"
@@ -102,6 +104,18 @@ type client struct {
 	ctx     context.Context
 }
 
+// defaultRetryIfErr is the default retry policy for the client if server closes connection.
+// It retries only idempotent requests or non-idempotent requests if server closes connection.
+// Does not resets timeout.
+func defaultRetryIfErr(req *fasthttp.Request, _ int, err error) (bool, bool) {
+	isIdempotent := req.Header.IsGet() || req.Header.IsHead() || req.Header.IsPut()
+	if !isIdempotent && !errors.Is(err, io.EOF) {
+		return false, false
+	}
+
+	return false, true
+}
+
 func NewClient(opt ...Option) Client {
 	opts := &options{
 		RequestModifiers:  make([]RequestFunc, 0),
@@ -118,6 +132,11 @@ func NewClient(opt ...Option) Client {
 		opts.UserAgent = defaultUserAgent
 	}
 
+	retryIfErr := opts.RetryIf
+	if retryIfErr == nil {
+		retryIfErr = defaultRetryIfErr
+	}
+
 	return &client{
 		clientOpts: &clientOpts{
 			reqMod:       opts.RequestModifiers,
@@ -126,9 +145,10 @@ func NewClient(opt ...Option) Client {
 			instrumenter: opts.Instrumenter,
 		},
 		c: &fasthttp.Client{
-			Name:      opts.UserAgent,
-			TLSConfig: opts.TLSConfig,
-			Dial:      opts.Dial,
+			Name:       opts.UserAgent,
+			TLSConfig:  opts.TLSConfig,
+			Dial:       opts.Dial,
+			RetryIfErr: retryIfErr,
 		},
 		baseURL: opts.BaseURL,
 		ctx:     opts.Context,
@@ -234,6 +254,11 @@ func (c client) WithOptions(opt ...Option) Client {
 		opts.UserAgent = defaultUserAgent
 	}
 
+	retryIfErr := opts.RetryIf
+	if retryIfErr == nil {
+		retryIfErr = defaultRetryIfErr
+	}
+
 	return &client{
 		clientOpts: &clientOpts{
 			reqMod:       opts.RequestModifiers,
@@ -242,9 +267,10 @@ func (c client) WithOptions(opt ...Option) Client {
 			instrumenter: opts.Instrumenter,
 		},
 		c: &fasthttp.Client{
-			Name:      opts.UserAgent,
-			TLSConfig: opts.TLSConfig,
-			Dial:      opts.Dial,
+			Name:       opts.UserAgent,
+			TLSConfig:  opts.TLSConfig,
+			Dial:       opts.Dial,
+			RetryIfErr: retryIfErr,
 		},
 		baseURL: opts.BaseURL,
 		ctx:     opts.Context,
