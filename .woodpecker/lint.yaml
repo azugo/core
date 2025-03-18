@@ -23,7 +23,7 @@ steps:
       event: push
 
   - name: review-go
-    image: woodpeckerci/plugin-reviewdog-golangci-lint:1.60
+    image: woodpeckerci/plugin-reviewdog-golangci-lint:1.61
     pull: true
     depends_on:
       - vendor
