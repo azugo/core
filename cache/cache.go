@@ -240,16 +240,18 @@ func Create[T any](cache *Cache, name string, opts ...Option) (Instance[T], erro
 
 // ValidateConnectionString validates connection string for specific cache type.
 func ValidateConnectionString(typ Type, connStr string) error {
-	if len(connStr) == 0 && typ != MemoryCache {
+	if typ == MemoryCache {
+		return nil
+	}
+
+	if len(connStr) == 0 {
 		return errors.New("connection string can not be empty")
 	}
 
 	var err error
 
+	//nolint:exhaustive // memory cache type require no validation
 	switch typ {
-	case MemoryCache:
-		// No validation needed for MemoryCache
-		return nil
 	case RedisCache:
 		_, err = ParseRedisURL(connStr)
 	case RedisClusterCache:
