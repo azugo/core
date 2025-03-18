@@ -145,7 +145,7 @@ func newRedisClusterClient(constr, password string) (redis.Cmdable, error) {
 	return redis.NewClusterClient(redisOptions), nil
 }
 
-// newRedisSentinelClient creates a new Redis Sentinel client
+// newRedisSentinelClient creates a new Redis Sentinel client.
 func newRedisSentinelClient(connectionString, password string) (redis.Cmdable, error) {
 	options, err := ParseRedisSentinelURL(connectionString)
 	if err != nil {
@@ -160,7 +160,7 @@ func newRedisSentinelClient(connectionString, password string) (redis.Cmdable, e
 	return redis.NewFailoverClient(options), nil
 }
 
-// ParseRedisSentinelURL parses Redis Sentinel URL to extract connection information
+// ParseRedisSentinelURL parses Redis Sentinel URL to extract connection information.
 func ParseRedisSentinelURL(urlStr string) (*redis.FailoverOptions, error) {
 	urlStr, insecureSkipVerify, err := parseCustomURLAttr(urlStr)
 	if err != nil {

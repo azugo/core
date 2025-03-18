@@ -240,22 +240,22 @@ func Create[T any](cache *Cache, name string, opts ...Option) (Instance[T], erro
 
 // ValidateConnectionString validates connection string for specific cache type.
 func ValidateConnectionString(typ Type, connStr string) error {
-    if len(connStr) == 0 {
-        return errors.New("connection string can not be empty")
-    }
+	if len(connStr) == 0 {
+		return errors.New("connection string can not be empty")
+	}
 
-    var err error
+	var err error
 
-    switch typ {
-    case RedisCache:
-        _, err = ParseRedisURL(connStr)
-    case RedisClusterCache:
-        _, err = ParseRedisClusterURL(connStr)
-    case RedisSentinelCache:
-        _, err = ParseRedisSentinelURL(connStr)
-    }
+	switch typ {
+	case RedisCache:
+		_, err = ParseRedisURL(connStr)
+	case RedisClusterCache:
+		_, err = ParseRedisClusterURL(connStr)
+	case RedisSentinelCache:
+		_, err = ParseRedisSentinelURL(connStr)
+	}
 
-    return err
+	return err
 }
 
 // InstrGet returns cache key if the operation is cache get event.
