@@ -157,15 +157,7 @@ func newRedisSentinelClient(connectionString, password string) (redis.Cmdable, e
 		options.Password = password
 	}
 
-	client := redis.NewFailoverClient(options)
-
-	// Test connection
-	if err := client.Ping(context.Background()).Err(); err != nil {
-		client.Close()
-		return nil, err
-	}
-
-	return client, nil
+	return redis.NewFailoverClient(options), nil
 }
 
 // ParseRedisSentinelURL parses Redis Sentinel URL to extract connection information
@@ -181,7 +173,7 @@ func ParseRedisSentinelURL(urlStr string) ([]string, string, *redis.FailoverOpti
 	}
 
 	if u.Scheme != "sentinel" {
-		return nil, "", nil, fmt.Errorf("redis sentinel URL must start with sentinel:// scheme")
+		return nil, "", nil, errors.New("redis sentinel URL must start with sentinel:// scheme")
 	}
 
 	// Extract username if present
@@ -192,21 +184,21 @@ func ParseRedisSentinelURL(urlStr string) ([]string, string, *redis.FailoverOpti
 
 	masterName := strings.TrimPrefix(u.Path, "/")
 	if masterName == "" {
-		return nil, "", nil, fmt.Errorf("master name is required in sentinel URL path")
+		return nil, "", nil, errors.New("master name is required in sentinel URL path")
 	}
 
 	if u.Host == "" {
-		return nil, "", nil, fmt.Errorf("sentinel addresses are required")
+		return nil, "", nil, errors.New("sentinel addresses are required")
 	}
 
-	sentinelAddrs := strings.Split(u.Host, ",")
-	if len(sentinelAddrs) == 0 {
-		return nil, "", nil, fmt.Errorf("at least one sentinel address is required")
+	addrs := strings.Split(u.Host, ",")
+	if len(addrs) == 0 {
+		return nil, "", nil, errors.New("at least one sentinel address is required")
 	}
 
 	options := &redis.FailoverOptions{
 		MasterName:    masterName,
-		SentinelAddrs: sentinelAddrs,
+		SentinelAddrs: addrs,
 		Username:      username,
 	}
 
@@ -219,6 +211,7 @@ func ParseRedisSentinelURL(urlStr string) ([]string, string, *redis.FailoverOpti
 			if err != nil {
 				return nil, "", nil, fmt.Errorf("invalid db value: %w", err)
 			}
+
 			options.DB = db
 		}
 
@@ -228,11 +221,12 @@ func ParseRedisSentinelURL(urlStr string) ([]string, string, *redis.FailoverOpti
 					MinVersion: tls.VersionTLS12,
 				}
 			}
+
 			options.TLSConfig.InsecureSkipVerify = true
 		}
 	}
 
-	return sentinelAddrs, masterName, options, nil
+	return addrs, masterName, options, nil
 }
 
 func (c *redisCache[T]) Get(ctx context.Context, key string, opts ...ItemOption[T]) (T, error) {
