@@ -247,6 +247,9 @@ func ValidateConnectionString(typ Type, connStr string) error {
 	var err error
 
 	switch typ {
+	case MemoryCache:
+		// No validation needed for MemoryCache
+		err = nil
 	case RedisCache:
 		_, err = ParseRedisURL(connStr)
 	case RedisClusterCache:
