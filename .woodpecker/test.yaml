@@ -27,4 +27,5 @@ steps:
       - tparse -all -file report.json
     when:
       status:
+        - success
         - failure
