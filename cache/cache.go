@@ -85,8 +85,10 @@ func (c *Cache) Start(ctx context.Context) error {
 
 		if opt.Type == RedisCache {
 			con, err = newRedisClient(opt.ConnectionString, opt.ConnectionPassword)
-		} else {
+		} else if opt.Type == RedisClusterCache {
 			con, err = newRedisClusterClient(opt.ConnectionString, opt.ConnectionPassword)
+		} else {
+			con, err = newRedisSentinelClient(opt.ConnectionString, opt.ConnectionPassword)
 		}
 
 		if err != nil {
@@ -111,15 +113,13 @@ func (c *Cache) Close() {
 	finish := opt.Instrumenter.Observe(context.Background(), InstrumentationClose)
 	defer finish(nil)
 
-	if opt.Type == RedisCache {
+	if opt.Type == RedisCache || opt.Type == RedisSentinelCache {
 		if v, ok := c.redisCon.(*redis.Client); ok {
 			_ = v.Close()
 		}
 
 		c.redisCon = nil
-	}
-
-	if opt.Type == RedisClusterCache {
+	} else if opt.Type == RedisClusterCache {
 		if v, ok := c.redisCon.(*redis.ClusterClient); ok {
 			_ = v.Close()
 		}
@@ -217,6 +217,16 @@ func Create[T any](cache *Cache, name string, opts ...Option) (Instance[T], erro
 		}
 
 		c = newRedisCache[T](name, con, opt...)
+	case RedisSentinelCache:
+		con := cache.redisCon
+		if o.ConnectionString != cache.redisConStr {
+			con, err = newRedisSentinelClient(o.ConnectionString, o.ConnectionPassword)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		c = newRedisCache[T](name, con, opt...)
 	}
 
 	if c != nil {
@@ -230,31 +240,29 @@ func Create[T any](cache *Cache, name string, opts ...Option) (Instance[T], erro
 
 // ValidateConnectionString validates connection string for specific cache type.
 func ValidateConnectionString(typ Type, connStr string) error {
-	if typ == RedisCache {
-		if len(connStr) == 0 {
-			return errors.New("connection string can not be empty")
-		}
-
-		if _, err := ParseRedisURL(connStr); err != nil {
-			return err
-		}
-
+	if typ == MemoryCache {
 		return nil
 	}
 
-	if typ == RedisClusterCache {
-		if len(connStr) == 0 {
-			return errors.New("cluster connection string can not be empty")
-		}
-
-		if _, err := ParseRedisClusterURL(connStr); err != nil {
-			return err
-		}
-
-		return nil
+	if len(connStr) == 0 {
+		return errors.New("connection string can not be empty")
 	}
 
-	return nil
+	var err error
+
+	//nolint:exhaustive // memory cache type require no validation
+	switch typ {
+	case RedisCache:
+		_, err = ParseRedisURL(connStr)
+	case RedisClusterCache:
+		_, err = ParseRedisClusterURL(connStr)
+	case RedisSentinelCache:
+		_, err = ParseRedisSentinelURL(connStr)
+	default:
+		return fmt.Errorf("unsupported cache type: %v", typ)
+	}
+
+	return err
 }
 
 // InstrGet returns cache key if the operation is cache get event.

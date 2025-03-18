@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"strconv"
+	"strings"
 	"time"
 
 	"azugo.io/core/instrumenter"
@@ -141,6 +143,90 @@ func newRedisClusterClient(constr, password string) (redis.Cmdable, error) {
 	}
 
 	return redis.NewClusterClient(redisOptions), nil
+}
+
+// newRedisSentinelClient creates a new Redis Sentinel client.
+func newRedisSentinelClient(connectionString, password string) (redis.Cmdable, error) {
+	options, err := ParseRedisSentinelURL(connectionString)
+	if err != nil {
+		return nil, err
+	}
+
+	// If password is provided override provided in connection string
+	if len(password) != 0 {
+		options.Password = password
+	}
+
+	return redis.NewFailoverClient(options), nil
+}
+
+// ParseRedisSentinelURL parses Redis Sentinel URL to extract connection information.
+func ParseRedisSentinelURL(urlStr string) (*redis.FailoverOptions, error) {
+	urlStr, insecureSkipVerify, err := parseCustomURLAttr(urlStr)
+	if err != nil {
+		return nil, err
+	}
+
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, err
+	}
+
+	if u.Scheme != "sentinel" {
+		return nil, errors.New("redis sentinel URL must start with sentinel:// scheme")
+	}
+
+	// Extract username if present
+	username := ""
+	if u.User != nil {
+		username = u.User.Username()
+	}
+
+	masterName := strings.TrimPrefix(u.Path, "/")
+	if masterName == "" {
+		return nil, errors.New("master name is required in sentinel URL path")
+	}
+
+	if u.Host == "" {
+		return nil, errors.New("sentinel addresses are required")
+	}
+
+	addrs := strings.Split(u.Host, ",")
+	if len(addrs) == 0 {
+		return nil, errors.New("at least one sentinel address is required")
+	}
+
+	options := &redis.FailoverOptions{
+		MasterName:    masterName,
+		SentinelAddrs: addrs,
+		Username:      username,
+	}
+
+	// Parse query parameters
+	if u.RawQuery != "" {
+		q := u.Query()
+
+		if dbStr := q.Get("db"); dbStr != "" {
+			db, err := strconv.Atoi(dbStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid db value: %w", err)
+			}
+
+			options.DB = db
+		}
+
+		if insecureSkipVerify {
+			if options.TLSConfig == nil {
+				options.TLSConfig = &tls.Config{
+					MinVersion: tls.VersionTLS12,
+				}
+			}
+
+			options.TLSConfig.InsecureSkipVerify = true
+		}
+	}
+
+	return options, nil
 }
 
 func (c *redisCache[T]) Get(ctx context.Context, key string, opts ...ItemOption[T]) (T, error) {

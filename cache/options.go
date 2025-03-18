@@ -64,6 +64,8 @@ const (
 	RedisCache Type = "redis"
 	// RedisClusterCache store data in Redis database cluster.
 	RedisClusterCache Type = "redis-cluster"
+	// RedisSentinelCache store data in Redis database with sentinel.
+	RedisSentinelCache Type = "redis-sentinel"
 )
 
 func (t Type) applyCache(c *cacheOptions) {
