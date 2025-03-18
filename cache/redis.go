@@ -147,7 +147,7 @@ func newRedisClusterClient(constr, password string) (redis.Cmdable, error) {
 
 // newRedisSentinelClient creates a new Redis Sentinel client
 func newRedisSentinelClient(connectionString, password string) (redis.Cmdable, error) {
-	_, _, options, err := ParseRedisSentinelURL(connectionString)
+	options, err := ParseRedisSentinelURL(connectionString)
 	if err != nil {
 		return nil, err
 	}
@@ -161,19 +161,19 @@ func newRedisSentinelClient(connectionString, password string) (redis.Cmdable, e
 }
 
 // ParseRedisSentinelURL parses Redis Sentinel URL to extract connection information
-func ParseRedisSentinelURL(urlStr string) ([]string, string, *redis.FailoverOptions, error) {
+func ParseRedisSentinelURL(urlStr string) (*redis.FailoverOptions, error) {
 	urlStr, insecureSkipVerify, err := parseCustomURLAttr(urlStr)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, err
 	}
 
 	u, err := url.Parse(urlStr)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, err
 	}
 
 	if u.Scheme != "sentinel" {
-		return nil, "", nil, errors.New("redis sentinel URL must start with sentinel:// scheme")
+		return nil, errors.New("redis sentinel URL must start with sentinel:// scheme")
 	}
 
 	// Extract username if present
@@ -184,16 +184,16 @@ func ParseRedisSentinelURL(urlStr string) ([]string, string, *redis.FailoverOpti
 
 	masterName := strings.TrimPrefix(u.Path, "/")
 	if masterName == "" {
-		return nil, "", nil, errors.New("master name is required in sentinel URL path")
+		return nil, errors.New("master name is required in sentinel URL path")
 	}
 
 	if u.Host == "" {
-		return nil, "", nil, errors.New("sentinel addresses are required")
+		return nil, errors.New("sentinel addresses are required")
 	}
 
 	addrs := strings.Split(u.Host, ",")
 	if len(addrs) == 0 {
-		return nil, "", nil, errors.New("at least one sentinel address is required")
+		return nil, errors.New("at least one sentinel address is required")
 	}
 
 	options := &redis.FailoverOptions{
@@ -209,7 +209,7 @@ func ParseRedisSentinelURL(urlStr string) ([]string, string, *redis.FailoverOpti
 		if dbStr := q.Get("db"); dbStr != "" {
 			db, err := strconv.Atoi(dbStr)
 			if err != nil {
-				return nil, "", nil, fmt.Errorf("invalid db value: %w", err)
+				return nil, fmt.Errorf("invalid db value: %w", err)
 			}
 
 			options.DB = db
@@ -226,7 +226,7 @@ func ParseRedisSentinelURL(urlStr string) ([]string, string, *redis.FailoverOpti
 		}
 	}
 
-	return addrs, masterName, options, nil
+	return options, nil
 }
 
 func (c *redisCache[T]) Get(ctx context.Context, key string, opts ...ItemOption[T]) (T, error) {

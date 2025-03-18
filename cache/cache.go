@@ -252,7 +252,7 @@ func ValidateConnectionString(typ Type, connStr string) error {
     case RedisClusterCache:
         _, err = ParseRedisClusterURL(connStr)
     case RedisSentinelCache:
-        _, _, _, err = ParseRedisSentinelURL(connStr)
+        _, err = ParseRedisSentinelURL(connStr)
     }
 
     return err
