@@ -12,7 +12,7 @@ steps:
       - go mod vendor
 
   - name: golangci-lint
-    image: golangci/golangci-lint:v1.60-alpine
+    image: golangci/golangci-lint:v1.61-alpine
     pull: true
     depends_on:
       - vendor
