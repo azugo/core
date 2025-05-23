@@ -13,7 +13,7 @@ type ErrorResponseError struct {
 }
 
 // ErrorResponse represents an error response.
-type ErrorResponse struct {
+type ErrorResponse struct { //nolint:errname
 	Errors []*ErrorResponseError `json:"errors" yaml:"errors" xml:"Errors>Error"`
 }
 

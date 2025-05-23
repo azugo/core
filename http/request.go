@@ -47,7 +47,7 @@ func (c client) ReleaseRequest(req *Request) {
 }
 
 // SetRequestURL sets the request URL.
-func (r Request) SetRequestURL(u string) error {
+func (r *Request) SetRequestURL(u string) error {
 	if baseURL := r.client.BaseURL(); baseURL != "" && !strings.Contains(u, "://") {
 		var err error
 		if u, err = url.JoinPath(baseURL, u); err != nil {
@@ -61,7 +61,7 @@ func (r Request) SetRequestURL(u string) error {
 }
 
 // BaseURL returns the base URL of the client.
-func (r Request) BaseURL() string {
+func (r *Request) BaseURL() string {
 	return r.client.BaseURL()
 }
 
