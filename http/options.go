@@ -14,6 +14,7 @@ type options struct {
 	TLSConfig         *tls.Config
 	Dial              fasthttp.DialFunc
 	RetryIf           fasthttp.RetryIfErrFunc
+	Transport         fasthttp.RoundTripper
 	Context           context.Context
 	Instrumenter      instrumenter.Instrumenter
 	UserAgent         string
@@ -56,6 +57,19 @@ func (c *contextOption) apply(o *options) {
 // Context sets the custom context for the HTTP client.
 func Context(ctx context.Context) Option {
 	return &contextOption{ctx}
+}
+
+type roundTripperOption struct {
+	Transport fasthttp.RoundTripper
+}
+
+func (r roundTripperOption) apply(o *options) {
+	o.Transport = r.Transport
+}
+
+// Transport option for the HTTP client.
+func Transport(t fasthttp.RoundTripper) Option {
+	return roundTripperOption{Transport: t}
 }
 
 // RetryIf is a function that determines if the request should be retried.

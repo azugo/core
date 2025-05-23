@@ -17,7 +17,7 @@ type Request struct {
 //
 // The returned request must be released after use by calling ReleaseRequest.
 func (c client) NewRequest() *Request {
-	v := c.requestPool.Get()
+	v := c.RequestPool.Get()
 
 	freq := fasthttp.AcquireRequest()
 	freq.Header.SetUserAgent(c.UserAgent())
@@ -43,7 +43,7 @@ func (c client) ReleaseRequest(req *Request) {
 	req.client = nil
 
 	fasthttp.ReleaseRequest(r)
-	c.requestPool.Put(req)
+	c.RequestPool.Put(req)
 }
 
 // SetRequestURL sets the request URL.

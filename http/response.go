@@ -62,7 +62,7 @@ func (r Response) Error() error {
 //
 // The returned response must be released after use by calling ReleaseResponse.
 func (c client) NewResponse() *Response {
-	v := c.responsePool.Get()
+	v := c.ResponsePool.Get()
 	if v == nil {
 		return &Response{
 			Response: fasthttp.AcquireResponse(),
@@ -81,5 +81,5 @@ func (c client) ReleaseResponse(res *Response) {
 	res.Response = nil
 
 	fasthttp.ReleaseResponse(r)
-	c.responsePool.Put(res)
+	c.ResponsePool.Put(res)
 }

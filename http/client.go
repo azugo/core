@@ -88,13 +88,13 @@ type ClientProvider interface {
 }
 
 type clientOpts struct {
-	requestPool  sync.Pool
-	responsePool sync.Pool
-	bufferPool   bytebufferpool.Pool
-	reqMod       []RequestFunc
-	respMod      []ResponseFunc
-	config       *Configuration
-	instrumenter instrumenter.Instrumenter
+	RequestPool   sync.Pool
+	ResponsePool  sync.Pool
+	BufferPool    bytebufferpool.Pool
+	RequestMod    []RequestFunc
+	ResponseMod   []ResponseFunc
+	Configuration *Configuration
+	Instrumenter  instrumenter.Instrumenter
 }
 
 type client struct {
@@ -139,15 +139,16 @@ func NewClient(opt ...Option) Client {
 
 	return &client{
 		clientOpts: &clientOpts{
-			reqMod:       opts.RequestModifiers,
-			respMod:      opts.ResponseModifiers,
-			config:       opts.Configuration,
-			instrumenter: opts.Instrumenter,
+			RequestMod:    opts.RequestModifiers,
+			ResponseMod:   opts.ResponseModifiers,
+			Configuration: opts.Configuration,
+			Instrumenter:  opts.Instrumenter,
 		},
 		c: &fasthttp.Client{
 			Name:       opts.UserAgent,
 			TLSConfig:  opts.TLSConfig,
 			Dial:       opts.Dial,
+			Transport:  opts.Transport,
 			RetryIfErr: retryIfErr,
 		},
 		baseURL: opts.BaseURL,
@@ -160,7 +161,7 @@ func (c client) Do(req *Request, resp *Response) error {
 		return c.ctx.Err()
 	}
 
-	for _, f := range c.reqMod {
+	for _, f := range c.RequestMod {
 		if err := f(c.ctx, req); err != nil {
 			return err
 		}
@@ -170,7 +171,7 @@ func (c client) Do(req *Request, resp *Response) error {
 		}
 	}
 
-	finish := c.instrumenter.Observe(c.ctx, InstrumentationRequest, req, resp)
+	finish := c.Instrumenter.Observe(c.ctx, InstrumentationRequest, req, resp)
 
 	err := c.c.Do(req.Request, resp.Response)
 
@@ -182,7 +183,7 @@ func (c client) Do(req *Request, resp *Response) error {
 
 	finish(err)
 
-	for _, f := range c.respMod {
+	for _, f := range c.ResponseMod {
 		if e := f(c.ctx, resp, err); e != nil {
 			return e
 		}
@@ -227,7 +228,7 @@ func (c client) WithBaseURL(url string) Client {
 
 // WithConfiguration returns a new client with specific named configuration.
 func (c client) WithConfiguration(name string) (Client, error) {
-	cl, ok := c.config.Clients[name]
+	cl, ok := c.Configuration.Clients[name]
 	if !ok {
 		return nil, fmt.Errorf("client %q not found", name)
 	}
@@ -238,13 +239,15 @@ func (c client) WithConfiguration(name string) (Client, error) {
 // WithOptions returns a new client with additional options applied.
 func (c client) WithOptions(opt ...Option) Client {
 	opts := &options{
-		RequestModifiers:  c.reqMod,
-		ResponseModifiers: c.respMod,
-		Configuration:     c.config,
+		RequestModifiers:  c.RequestMod,
+		ResponseModifiers: c.ResponseMod,
+		Configuration:     c.Configuration,
 		Context:           c.ctx,
-		Instrumenter:      c.instrumenter,
+		Instrumenter:      c.Instrumenter,
 		TLSConfig:         c.c.TLSConfig,
 		Dial:              c.c.Dial,
+		Transport:         c.c.Transport,
+		RetryIf:           c.c.RetryIfErr,
 		UserAgent:         c.c.Name,
 		BaseURL:           c.baseURL,
 	}
@@ -261,15 +264,16 @@ func (c client) WithOptions(opt ...Option) Client {
 
 	return &client{
 		clientOpts: &clientOpts{
-			reqMod:       opts.RequestModifiers,
-			respMod:      opts.ResponseModifiers,
-			config:       opts.Configuration,
-			instrumenter: opts.Instrumenter,
+			RequestMod:    opts.RequestModifiers,
+			ResponseMod:   opts.ResponseModifiers,
+			Configuration: opts.Configuration,
+			Instrumenter:  opts.Instrumenter,
 		},
 		c: &fasthttp.Client{
 			Name:       opts.UserAgent,
 			TLSConfig:  opts.TLSConfig,
 			Dial:       opts.Dial,
+			Transport:  opts.Transport,
 			RetryIfErr: retryIfErr,
 		},
 		baseURL: opts.BaseURL,

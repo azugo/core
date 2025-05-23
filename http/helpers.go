@@ -133,15 +133,15 @@ func (c client) PostMultipartForm(url string, form *multipart.Form, opt ...Reque
 
 	req.Header.SetMultipartFormBoundary(boundary)
 
-	buf := c.bufferPool.Get()
+	buf := c.BufferPool.Get()
 	if err := fasthttp.WriteMultipartForm(buf, form, boundary); err != nil {
-		c.bufferPool.Put(buf)
+		c.BufferPool.Put(buf)
 
 		return nil, err
 	}
 
 	req.SetBodyRaw(buf.Bytes())
-	c.bufferPool.Put(buf)
+	c.BufferPool.Put(buf)
 
 	return c.call(req)
 }
