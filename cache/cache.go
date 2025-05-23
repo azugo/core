@@ -77,31 +77,35 @@ func (c *Cache) Start(ctx context.Context) error {
 
 	finish := opt.Instrumenter.Observe(ctx, InstrumentationStart)
 
-	if opt.Type == RedisCache || opt.Type == RedisClusterCache {
-		var (
-			con redis.Cmdable
-			err error
-		)
+	if opt.Type != RedisCache && opt.Type != RedisClusterCache && opt.Type != RedisSentinelCache {
+		finish(nil)
 
-		if opt.Type == RedisCache {
-			con, err = newRedisClient(opt.ConnectionString, opt.ConnectionPassword)
-		} else if opt.Type == RedisClusterCache {
-			con, err = newRedisClusterClient(opt.ConnectionString, opt.ConnectionPassword)
-		} else {
-			con, err = newRedisSentinelClient(opt.ConnectionString, opt.ConnectionPassword)
-		}
-
-		if err != nil {
-			finish(err)
-
-			return err
-		}
-
-		c.redisCon = con
-		c.redisConStr = opt.ConnectionString
+		return nil
 	}
 
-	finish(nil)
+	var (
+		con redis.Cmdable
+		err error
+	)
+
+	//nolint:exhaustive // check is already done above
+	switch opt.Type {
+	case RedisCache:
+		con, err = newRedisClient(opt.ConnectionString, opt.ConnectionPassword)
+	case RedisClusterCache:
+		con, err = newRedisClusterClient(opt.ConnectionString, opt.ConnectionPassword)
+	case RedisSentinelCache:
+		con, err = newRedisSentinelClient(opt.ConnectionString, opt.ConnectionPassword)
+	}
+
+	if err != nil {
+		finish(err)
+
+		return err
+	}
+
+	c.redisCon = con
+	c.redisConStr = opt.ConnectionString
 
 	return nil
 }
