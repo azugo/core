@@ -15,6 +15,8 @@ Azugo framework core.
 
 * `ENVIRONMENT` - An App environment setting (allowed values are `Development`, `Staging` and `Production`).
 * `LOG_LEVEL` - Minimal log level (defaults to `info`, allowed values are `debug`, `info`, `warn`, `error`, `fatal`, `panic`).
+* `LOG_FORMAT` - Log output format (defaults to `console` in development environment and `ecsjson` in staging and production).
+* `LOG_OUTPUT` - Log output location (defaults to `stderr`, allowed values are `stderr`, `stdout` and file path or `file://` URL)
 
 ### Cache
 

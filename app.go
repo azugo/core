@@ -146,7 +146,9 @@ func (a *App) Instrumenter() instrumenter.Instrumenter {
 
 // Start web application.
 func (a *App) Start() error {
-	a.initLogger()
+	if err := a.initLogger(); err != nil {
+		return err
+	}
 
 	if err := a.initCache(); err != nil {
 		return err

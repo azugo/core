@@ -23,6 +23,8 @@ type Configuration struct {
 
 	// Cache configuration section.
 	Cache *Cache
+	// Log configuration section.
+	Log *Log
 }
 
 // New returns a new configuration.
@@ -79,6 +81,7 @@ func Bind[T any](c *T, prefix string, v *viper.Viper) *T {
 // Bind binds configuration section to viper.
 func (c *Configuration) Bind(_ string, v *viper.Viper) {
 	c.Cache = Bind(c.Cache, "cache", v)
+	c.Log = Bind(c.Log, "log", v)
 }
 
 // Core returns the core configuration.
@@ -178,6 +181,10 @@ func (c *Configuration) Load(cmd *cobra.Command, config any, environment string)
 // Validate the configuration.
 func (c *Configuration) Validate(validate *validation.Validate) error {
 	if err := c.Cache.Validate(validate); err != nil {
+		return err
+	}
+
+	if err := c.Log.Validate(validate); err != nil {
 		return err
 	}
 
