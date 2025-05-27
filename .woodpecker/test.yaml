@@ -2,7 +2,6 @@ when:
   branch:
     - main
   event:
-    - push
     - pull_request
 
 matrix:
