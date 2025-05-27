@@ -100,17 +100,19 @@ func (a *App) initLogger() error {
 		logLevel = parseLogLevel(conf.Level, zap.InfoLevel)
 	}
 
+	devOutput := a.Env().IsDevelopment() && !info.IsContainer()
+
 	switch conf.Output {
 	case "":
 		fallthrough
 	case "stderr":
-		if a.Env().IsDevelopment() && !info.IsContainer() {
+		if devOutput {
 			output = zapcore.AddSync(colorable.NewColorableStderr())
 		} else {
 			output = zapcore.AddSync(os.Stderr)
 		}
 	case "stdout":
-		if a.Env().IsDevelopment() && !info.IsContainer() {
+		if devOutput {
 			output = zapcore.AddSync(colorable.NewColorableStdout())
 		} else {
 			output = zapcore.AddSync(os.Stdout)
@@ -146,12 +148,15 @@ func (a *App) initLogger() error {
 	}
 
 	switch {
-	case (conf.Format == "console" || conf.Format == "") && a.Env().IsDevelopment() && !info.IsContainer():
-		conf := zap.NewDevelopmentEncoderConfig()
-		conf.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	case (conf.Format == "console" || conf.Format == "") && devOutput:
+		devenc := zap.NewDevelopmentEncoderConfig()
+
+		if conf.Output == "" || conf.Output == "stdout" || conf.Output == "stderr" {
+			devenc.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		}
 
 		core = zapcore.NewCore(
-			zapcore.NewConsoleEncoder(conf),
+			zapcore.NewConsoleEncoder(devenc),
 			output,
 			logLevel,
 		)
