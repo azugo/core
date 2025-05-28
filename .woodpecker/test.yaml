@@ -16,15 +16,4 @@ steps:
     environment:
       CGO_ENABLED: 0
     commands:
-      - go test -cover -coverprofile=coverage.out -covermode=atomic -json ./... > report.json
-
-  - name: results
-    image: golang:${GO_VERSION}-alpine
-    commands:
-      - apk --no-cache add git
-      - go install github.com/mfridman/tparse@latest
-      - tparse -all -file report.json
-    when:
-      status:
-        - success
-        - failure
+      - go test -v ./...
