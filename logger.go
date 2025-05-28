@@ -6,33 +6,37 @@ package core
 
 import (
 	"fmt"
-	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 
 	"azugo.io/core/system"
 
-	"github.com/mattn/go-colorable"
-	"go.elastic.co/ecszap"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-var (
-	logOutputDriversMu sync.RWMutex
-	logOutputDrivers   = make(map[string]func(output *url.URL) (zapcore.WriteSyncer, error))
+const (
+	logFormatConsole = "console"
+	logFormatECSJSON = "ecsjson"
+	logFormatJSON    = "json"
 )
 
-func RegisterLogOutput(name string, fn func(output *url.URL) (zapcore.WriteSyncer, error)) {
+var (
+	logOutputDriversMu sync.RWMutex
+	logOutputDrivers   = make(map[string]func(app *App, format, output string, level zapcore.Level) (zapcore.Core, error))
+)
+
+// RegisterLogDriver registers a new log type driver.
+func RegisterLogDriver(name string, fn func(app *App, format, output string, level zapcore.Level) (zapcore.Core, error)) {
 	logOutputDriversMu.Lock()
 	defer logOutputDriversMu.Unlock()
 
 	logOutputDrivers[name] = fn
 }
 
-func (a *App) loggerFields(info *system.Info) []zap.Field {
+func (a *App) loggerFields() []zap.Field {
+	info := system.CollectInfo()
+
 	fields := make([]zap.Field, 0, 3)
 	if a.AppName != "" {
 		fields = append(fields, zap.String("service.name", a.AppName))
@@ -85,14 +89,9 @@ func (a *App) initLogger() error {
 		return nil
 	}
 
-	info := system.CollectInfo()
 	conf := a.Config().Log
 
-	var (
-		logLevel zapcore.Level
-		core     zapcore.Core
-		output   zapcore.WriteSyncer
-	)
+	var logLevel zapcore.Level
 
 	if a.Env().IsDevelopment() {
 		logLevel = parseLogLevel(conf.Level, zap.DebugLevel)
@@ -100,89 +99,29 @@ func (a *App) initLogger() error {
 		logLevel = parseLogLevel(conf.Level, zap.InfoLevel)
 	}
 
-	devOutput := a.Env().IsDevelopment() && !info.IsContainer()
-
-	switch conf.Output {
-	case "":
-		fallthrough
-	case "stderr":
-		if devOutput {
-			output = zapcore.AddSync(colorable.NewColorableStderr())
-		} else {
-			output = zapcore.AddSync(os.Stderr)
-		}
-	case "stdout":
-		if devOutput {
-			output = zapcore.AddSync(colorable.NewColorableStdout())
-		} else {
-			output = zapcore.AddSync(os.Stdout)
-		}
-	default:
-		var path *url.URL
-
-		if filepath.IsAbs(conf.Output) {
-			path = &url.URL{
-				Scheme: "file",
-				Path:   conf.Output,
-			}
-		} else {
-			u, err := url.Parse(conf.Output)
-			if err != nil {
-				return fmt.Errorf("failed to parse log output %q: %w", conf.Output, err)
-			}
-
-			path = u
-		}
-
-		driver, ok := logOutputDrivers[path.Scheme]
-		if !ok {
-			return fmt.Errorf("unsupported log output %q", path.Scheme)
-		}
-
-		f, err := driver(path)
-		if err != nil {
-			return fmt.Errorf("failed to create log output %q: %w", path, err)
-		}
-
-		output = f
+	driver, ok := logOutputDrivers[conf.Type]
+	if !ok {
+		return fmt.Errorf("unsupported log driver %q", conf.Type)
 	}
 
-	switch {
-	case (conf.Format == "console" || conf.Format == "") && devOutput:
-		devenc := zap.NewDevelopmentEncoderConfig()
+	core, err := driver(a, conf.Format, conf.Output, logLevel)
+	if err != nil {
+		return fmt.Errorf("failed to initialize log driver %q: %w", conf.Type, err)
+	}
 
-		if conf.Output == "" || conf.Output == "stdout" || conf.Output == "stderr" {
-			devenc.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	if conf.Secondary != nil {
+		// Secondary logger is configured.
+		driver, ok = logOutputDrivers[conf.Secondary.Type]
+		if !ok {
+			return fmt.Errorf("unsupported log driver %q", conf.Secondary.Type)
 		}
 
-		core = zapcore.NewCore(
-			zapcore.NewConsoleEncoder(devenc),
-			output,
-			logLevel,
-		)
-	case conf.Format == "ecsjson" || conf.Format == "":
-		// Use ECS JSON format.
-		core = ecszap.NewCore(
-			ecszap.NewDefaultEncoderConfig(),
-			output,
-			logLevel,
-		)
-	case conf.Format == "console":
-		// Use console format.
-		core = zapcore.NewCore(
-			zapcore.NewConsoleEncoder(zap.NewProductionEncoderConfig()),
-			output,
-			logLevel,
-		)
-	case conf.Format == "json":
-		// Use JSON format.
-		core = zapcore.NewCore(
-			zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
-			output,
-			logLevel,
-		)
-	default:
-		return fmt.Errorf("unsupported log format %q", conf.Format)
+		secondaryCore, err := driver(a, conf.Secondary.Format, conf.Secondary.Output, parseLogLevel(conf.Secondary.Level, zap.InfoLevel))
+		if err != nil {
+			return fmt.Errorf("failed to initialize log driver %q: %w", conf.Secondary.Type, err)
+		}
+
+		core = zapcore.NewTee(core, secondaryCore)
 	}
 
 	opts := []zap.Option{
@@ -196,7 +135,7 @@ func (a *App) initLogger() error {
 		)
 	}
 
-	a.logger = zap.New(core, opts...).With(a.loggerFields(info)...)
+	a.logger = zap.New(core, opts...).With(a.loggerFields()...)
 
 	return nil
 }
@@ -205,7 +144,7 @@ func (a *App) initLogger() error {
 //
 // Default fields are automatically added to the logger.
 func (a *App) ReplaceLogger(logger *zap.Logger) error {
-	a.logger = logger.With(a.loggerFields(system.CollectInfo())...)
+	a.logger = logger.With(a.loggerFields()...)
 
 	return nil
 }
@@ -228,15 +167,4 @@ func parseLogLevel(level string, defaultLevel zapcore.Level) zapcore.Level {
 	}
 
 	return l
-}
-
-func init() {
-	RegisterLogOutput("file", func(u *url.URL) (zapcore.WriteSyncer, error) {
-		f, err := os.OpenFile(u.Path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open log file %q: %w", u.Path, err)
-		}
-
-		return zapcore.AddSync(f), nil
-	})
 }
