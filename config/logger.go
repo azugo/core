@@ -12,7 +12,7 @@ import (
 
 // Logger represents the logging output configuration.
 type Logger struct {
-	// Type of the logger (allwed values are `console`, `file` and other registered logging targets).
+	// Type of the logger (allowed values are `console`, `file` and other registered logging targets).
 	Type string `mapstructure:"type" validate:"required"`
 	// Level of the logging output (defaults to `info`).
 	Level string `mapstructure:"level" validate:"omitempty,oneof=debug info warn error dpanic panic fatal"`

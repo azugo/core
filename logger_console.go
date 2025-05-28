@@ -38,6 +38,8 @@ func init() {
 			} else {
 				target = zapcore.AddSync(os.Stdout)
 			}
+		default:
+			return nil, fmt.Errorf("unsupported console log output %q", output)
 		}
 
 		switch {
