@@ -34,7 +34,7 @@ type Log struct {
 	Output string `mapstructure:"output"`
 
 	// Secondary logging output configuration.
-	Secondary *Logger `mapstructure:"secondary" validate:"omitempty,dive"`
+	Secondary *Logger `mapstructure:"secondary" validate:"omitempty"`
 }
 
 // Validate logger configuration section.
