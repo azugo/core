@@ -22,6 +22,7 @@ type options struct {
 	RequestModifiers  []RequestFunc
 	ResponseModifiers []ResponseFunc
 	Configuration     *Configuration
+	StreamResponse    bool
 }
 
 func (o *options) apply(opts []Option) {
@@ -126,4 +127,11 @@ type Instrumenter instrumenter.Instrumenter
 
 func (i Instrumenter) apply(c *options) {
 	c.Instrumenter = instrumenter.Instrumenter(i)
+}
+
+// StreamResponse enables receiving response as a stream for the HTTP client.
+type StreamResponse bool
+
+func (s StreamResponse) apply(o *options) {
+	o.StreamResponse = bool(s)
 }
