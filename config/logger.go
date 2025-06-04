@@ -17,9 +17,9 @@ type Logger struct {
 	// Level of the logging output (defaults to `info`).
 	Level string `mapstructure:"level" validate:"omitempty,oneof=debug info warn error dpanic panic fatal"`
 	// Format of the logging output (defaults to `console` in development environment and `ecsjson` in staging and production).
-	Format string `mapstructure:"format" validate:"required,oneof=console json ecsjson"`
+	Format string `mapstructure:"format" validate:"omitempty,oneof=console json ecsjson"`
 	// Output location (type sepcific output location).
-	Output string `mapstructure:"output" validate:"required"`
+	Output string `mapstructure:"output" validate:"omitempty"`
 }
 
 // Log configuration section.
