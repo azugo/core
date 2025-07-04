@@ -241,3 +241,39 @@ func (c client) Delete(url string, opt ...RequestOption) error {
 
 	return resp.Error()
 }
+
+// Patch performs a DELETE request with the payload to the specified URL.
+func (c client) DeleteWithBody(url string, body []byte, opt ...RequestOption) ([]byte, error) {
+	req := c.NewRequest()
+	if err := req.SetRequestURL(url); err != nil {
+		return nil, err
+	}
+
+	req.apply(opt)
+
+	req.Header.SetMethod(fasthttp.MethodDelete)
+	req.SetBodyRaw(body)
+
+	return c.call(req)
+}
+
+// Delete performs a DELETE request to the specified URL and unmarshals the response into v.
+func (c client) DeleteJSON(url string, body, v any, opt ...RequestOption) error {
+	reqBody, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+
+	opt = append([]RequestOption{WithHeader(fasthttp.HeaderContentType, "application/json")}, opt...)
+
+	resp, err := c.DeleteWithBody(url, reqBody, opt...)
+	if err != nil {
+		return err
+	}
+
+	if len(resp) > 0 {
+		return json.Unmarshal(resp, v)
+	}
+
+	return nil
+}
