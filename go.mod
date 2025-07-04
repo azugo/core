@@ -1,4 +1,4 @@
-module azugo.io/core
+module github.com/a-prucevs-zz/core
 
 go 1.23.9
 
