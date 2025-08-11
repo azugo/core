@@ -219,25 +219,40 @@ func (c client) PatchJSON(url string, body, v any, opt ...RequestOption) error {
 }
 
 // Delete performs a DELETE request to the specified URL.
-func (c client) Delete(url string, opt ...RequestOption) error {
+func (c client) Delete(url string, opt ...RequestOption) ([]byte, error) {
 	req := c.NewRequest()
 	if err := req.SetRequestURL(url); err != nil {
-		return err
+		return nil, err
 	}
 
 	req.apply(opt)
 
 	req.Header.SetMethod(fasthttp.MethodDelete)
 
-	resp := c.NewResponse()
-	defer c.ReleaseResponse(resp)
+	return c.call(req)
+}
 
-	err := c.Do(req, resp)
-	c.ReleaseRequest(req)
+// DeleteJSON performs a DELETE request to the specified URL and unmarshals the response into v.
+func (c client) DeleteJSON(url string, body, v any, opt ...RequestOption) error {
+	if body != nil {
+		buf, err := json.Marshal(body)
+		if err != nil {
+			return err
+		}
 
+		if len(buf) > 0 {
+			opt = append([]RequestOption{WithHeader(fasthttp.HeaderContentType, "application/json"), WithBody(buf)}, opt...)
+		}
+	}
+
+	resp, err := c.Delete(url, opt...)
 	if err != nil {
 		return err
 	}
 
-	return resp.Error()
+	if len(resp) > 0 {
+		return json.Unmarshal(resp, v)
+	}
+
+	return nil
 }

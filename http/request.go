@@ -130,3 +130,18 @@ func WithQueryArg(key string, value any, override ...bool) RequestOption {
 		Override: o,
 	}
 }
+
+type requestBody struct {
+	Body []byte
+}
+
+func (b *requestBody) apply(r *Request) {
+	r.SetBodyRaw(b.Body)
+}
+
+// WithBody sets the content for the request body.
+func WithBody(body []byte) RequestOption {
+	return &requestBody{
+		Body: body,
+	}
+}

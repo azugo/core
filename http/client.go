@@ -78,7 +78,9 @@ type Client interface {
 	// PatchJSON sends an HTTP PATCH request and unmarshals response body into v.
 	PatchJSON(url string, body, v any, opt ...RequestOption) error
 	// Delete sends an HTTP DELETE request.
-	Delete(url string, opt ...RequestOption) error
+	Delete(url string, opt ...RequestOption) ([]byte, error)
+	// DeleteJSON sends an HTTP DELETE request and unmarshals response body into v.
+	DeleteJSON(url string, body, v any, opt ...RequestOption) error
 }
 
 // ClientProvider is the interface that provides HTTP client.
