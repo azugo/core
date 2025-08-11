@@ -406,8 +406,49 @@ func TestDeleteRequest(t *testing.T) {
 	defer s.Stop()
 
 	c := NewClient(s.DialContext())
-	err := c.Delete("http://localhost:8080")
+	_, err := c.Delete("http://localhost:8080")
 	qt.Assert(t, qt.IsNil(err))
+}
+
+func TestDeleteJSONRequest(t *testing.T) {
+	s := newTestHttpServer()
+	s.Handler = func(ctx *fasthttp.RequestCtx) {
+		if string(ctx.Request.Header.Method()) != fasthttp.MethodDelete {
+			ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
+			return
+		}
+
+		if !bytes.Equal(ctx.Request.Header.ContentType(), strContentTypeJSON) {
+			ctx.SetStatusCode(fasthttp.StatusUnprocessableEntity)
+			return
+		}
+
+		if string(ctx.Request.Body()) != `{"message":"Hello World"}` {
+			ctx.SetStatusCode(fasthttp.StatusBadRequest)
+			return
+		}
+
+		ctx.SetContentTypeBytes(strContentTypeJSON)
+		ctx.SetBodyString(`{"status":true}`)
+		ctx.SetStatusCode(fasthttp.StatusOK)
+	}
+	s.Start()
+	defer s.Stop()
+
+	c := NewClient(s.DialContext())
+	req := struct {
+		Message string `json:"message"`
+	}{
+		Message: "Hello World",
+	}
+
+	resp := struct {
+		Status bool `json:"status"`
+	}{}
+
+	err := c.DeleteJSON("http://localhost:8080", req, &resp)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(resp.Status))
 }
 
 func TestWithAuthorizationHeader(t *testing.T) {
