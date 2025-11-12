@@ -13,6 +13,7 @@ import (
 	"azugo.io/core/instrumenter"
 
 	"github.com/dgraph-io/ristretto"
+	json "github.com/goccy/go-json"
 )
 
 type memoryCache[T any] struct {
@@ -21,6 +22,19 @@ type memoryCache[T any] struct {
 	lock         sync.Mutex
 	loader       func(ctx context.Context, key string) (any, error)
 	instrumenter instrumenter.Instrumenter
+	serialize    bool
+}
+
+// decode restores a cached value into out when serialization is enabled.
+func (c *memoryCache[T]) decode(value any, out *T) error {
+	switch v := value.(type) {
+	case []byte:
+		return json.Unmarshal(v, out)
+	case string:
+		return json.Unmarshal([]byte(v), out)
+	default:
+		return fmt.Errorf("invalid cache value type: %T", value)
+	}
 }
 
 func newMemoryCache[T any](opts ...Option) (Instance[T], error) {
@@ -51,6 +65,7 @@ func newMemoryCache[T any](opts ...Option) (Instance[T], error) {
 		ttl:          opt.TTL,
 		loader:       loader,
 		instrumenter: opt.Instrumenter,
+		serialize:    !opt.MemoryRaw, // serializes by default, unless explicitly toggled off
 	}, nil
 }
 
@@ -87,10 +102,16 @@ func (c *memoryCache[T]) Get(ctx context.Context, key string, _ ...ItemOption[T]
 	)
 
 	if value, found = c.cache.Get(key); found {
-		val, _ := value.(T)
+		if c.serialize {
+			if err := c.decode(value, &val); err != nil {
+				finish(err)
+				return val, err
+			}
+		} else {
+			val, _ = value.(T)
+		}
 
 		finish(nil)
-
 		return val, nil
 	}
 
@@ -115,6 +136,14 @@ func (c *memoryCache[T]) Get(ctx context.Context, key string, _ ...ItemOption[T]
 func (c *memoryCache[T]) set(key string, v any, ttl time.Duration) error {
 	if c.cache == nil {
 		return ErrCacheClosed
+	}
+
+	if c.serialize {
+		buf, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		v = buf
 	}
 
 	if ttl == 0 {
@@ -163,7 +192,14 @@ func (c *memoryCache[T]) Pop(ctx context.Context, key string) (T, error) {
 
 	c.cache.Del(key)
 
-	val, _ = i.(T)
+	if c.serialize {
+		if err := c.decode(i, &val); err != nil {
+			finish(err)
+			return val, err
+		}
+	} else {
+		val, _ = i.(T)
+	}
 
 	finish(nil)
 

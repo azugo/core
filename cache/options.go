@@ -19,6 +19,7 @@ type cacheOptions struct {
 	KeyPrefix          string
 	Loader             func(ctx context.Context, key string) (any, error)
 	Instrumenter       instrumenter.Instrumenter
+	MemoryRaw          bool
 }
 
 // Option for the cache instance.
@@ -122,4 +123,12 @@ type Instrumenter instrumenter.Instrumenter
 
 func (i Instrumenter) applyCache(c *cacheOptions) {
 	c.Instrumenter = instrumenter.Instrumenter(i)
+}
+
+// MemoryRaw disables JSON serialization for memory cache if set to true.
+// Default behavior without this option is to JSON serialize values, matching Redis cache behavior.
+type MemoryRaw bool
+
+func (m MemoryRaw) applyCache(c *cacheOptions) {
+	c.MemoryRaw = bool(m)
 }
