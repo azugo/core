@@ -17,8 +17,8 @@ func TestLogFields(t *testing.T) {
 
 	a.Log().Info("test", zap.String("field", "value"))
 
-	qt.Assert(t, qt.HasLen(logs.All(), 2))
-	entry := logs.All()[1]
+	qt.Assert(t, qt.HasLen(logs.All(), 1))
+	entry := logs.All()[0]
 	qt.Check(t, qt.Equals(entry.Message, "test"))
 	qt.Check(t, qt.Equals(entry.Level, zap.InfoLevel))
 	fields := entry.ContextMap()

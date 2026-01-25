@@ -23,6 +23,12 @@ type Options struct {
 
 	// Configuration object that implements config.Configurable interface.
 	Configuration any
+
+	// ConfigModifier are function that will be applied to the underlying
+	// configuration engine before the configuration is loaded.
+	// Use it to set defaults, bind environment variables, or fine-tune
+	// other configuration settings.
+	ConfigModifier config.Modifier
 }
 
 // New returns new Azugo pre-configured core server with default configuration.
@@ -45,6 +51,10 @@ func New(cmd *cobra.Command, opt Options) (*core.App, error) {
 	}
 
 	a.SetConfig(cmd, conf)
+
+	if opt.ConfigModifier != nil {
+		conf.AddModifier(opt.ConfigModifier)
+	}
 
 	// Load configuration
 	if err := conf.Load(cmd, c, string(a.Env())); err != nil {

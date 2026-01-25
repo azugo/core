@@ -5,6 +5,7 @@
 package server
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,8 +16,10 @@ import (
 // Runnable provides methods to run application that will gracefully stop.
 type Runnable interface {
 	Start() error
-	Log() *zap.Logger
 	Stop()
+
+	String() string
+	Log() *zap.Logger
 }
 
 // Run starts an application and waits for it to finish.
@@ -27,12 +30,18 @@ func Run(a Runnable) {
 
 	go func() {
 		if err := a.Start(); err != nil {
-			a.Log().With(zap.Error(err)).Fatal("failed to start service")
+			a.Log().With(zap.Error(err)).Fatal("Failed to start service")
+
+			return
 		}
+
+		a.Log().Info(fmt.Sprintf("Starting %s...", a.String()))
 	}()
 
-	<-done
+	s := <-done
 	signal.Stop(done)
+
+	a.Log().Info(fmt.Sprintf("Received %s signal, stopping service", s))
 
 	a.Stop()
 }

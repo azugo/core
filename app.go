@@ -160,8 +160,6 @@ func (a *App) Start() error {
 
 	a.initHTTPClient()
 
-	a.Log().Info(fmt.Sprintf("Starting %s...", a.String()))
-
 	return nil
 }
 

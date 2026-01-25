@@ -45,7 +45,6 @@ func TestNewApp(t *testing.T) {
 	qt.Assert(t, qt.IsNil(err))
 
 	qt.Check(t, qt.Equals(a.Env(), EnvironmentDevelopment))
-	qt.Check(t, qt.HasLen(logs.All(), 1))
-	qt.Check(t, qt.Equals(logs.All()[0].Message, "Starting Test 1.0.0 (built with test)..."))
+	qt.Check(t, qt.HasLen(logs.All(), 0))
 	qt.Check(t, qt.Equals(a.String(), "Test 1.0.0 (built with test)"))
 }

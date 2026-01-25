@@ -14,12 +14,19 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Modifier is a function that receives the underlying configuration backend/instance
+// and may call SetDefault, BindEnv, or adjust other settings. It is
+// exposed so other packages (for example server) can accept these as options
+// without importing the configuration backend directly.
+type Modifier func(v *viper.Viper)
+
 // Configuration for the application.
 type Configuration struct {
 	v          *viper.Viper
 	loaded     bool
 	configName string
 	validate   *validation.Validate
+	modifiers  []Modifier
 
 	// Cache configuration section.
 	Cache *Cache
@@ -38,6 +45,17 @@ func New() *Configuration {
 	}
 
 	return c
+}
+
+// AddModifier registers a function that will be called during Load to
+// modify/configure the underlying configuration engine. Use this to set defaults,
+// bind environment variables, or otherwise fine-tune settings based on runtime info.
+func (c *Configuration) AddModifier(fn Modifier) {
+	if fn == nil {
+		return
+	}
+
+	c.modifiers = append(c.modifiers, fn)
 }
 
 // Binder is an interface that can be implemented by configuration
@@ -78,7 +96,7 @@ func Bind[T any](c *T, prefix string, v *viper.Viper) *T {
 	return c
 }
 
-// Bind binds configuration section to viper.
+// Bind configuration section to the configuration backend/instance.
 func (c *Configuration) Bind(_ string, v *viper.Viper) {
 	c.Cache = Bind(c.Cache, "cache", v)
 	c.Log = Bind(c.Log, "log", v)
@@ -133,6 +151,11 @@ func (c *Configuration) Load(cmd *cobra.Command, config any, environment string)
 		if extbind, ok := config.(CmdBinder); ok {
 			extbind.BindCmd(cmd, c.v)
 		}
+	}
+
+	// Run registered configuration modifier functions on the configuration.
+	for _, fn := range c.modifiers {
+		fn(c.v)
 	}
 
 	// Load configuration

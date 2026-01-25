@@ -12,6 +12,7 @@ import (
 	"azugo.io/core/test"
 
 	"github.com/go-quicktest/qt"
+	"github.com/spf13/viper"
 )
 
 type App struct {
@@ -28,8 +29,7 @@ func (a *App) Start() error {
 	a.wg.Add(1)
 
 	// Start should not exit
-	<-(chan int)(nil)
-	return nil
+	select {}
 }
 
 func (a *App) Stop() {
@@ -42,6 +42,9 @@ func TestApp(t *testing.T) {
 	a, err := New(nil, Options{
 		AppName: "Test",
 		AppVer:  "1.0.0",
+		ConfigModifier: func(v *viper.Viper) {
+			v.SetDefault("log.output", "stdout")
+		},
 	})
 	qt.Assert(t, qt.IsNil(err))
 	_ = test.ObservedLogs(a)
@@ -53,6 +56,7 @@ func TestApp(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	qt.Check(t, qt.IsTrue(app.Config().Ready()))
+	qt.Check(t, qt.Equals(app.Config().Log.Output, "stdout"))
 	qt.Check(t, qt.Equals(a.Config().Cache.Type, cache.MemoryCache))
 	qt.Check(t, qt.Equals(app.Env(), core.EnvironmentProduction))
 	qt.Check(t, qt.IsNil(a.Cache().Ping(context.TODO())))
@@ -61,6 +65,30 @@ func TestApp(t *testing.T) {
 	proc, err := os.FindProcess(os.Getpid())
 	qt.Assert(t, qt.IsNil(err))
 	proc.Signal(os.Interrupt)
+
 	// Wait for app to finish
 	app.wg.Wait()
+}
+
+func TestAppLogStart(t *testing.T) {
+	a, err := New(nil, Options{
+		AppName: "Test",
+		AppVer:  "1.0.0",
+	})
+	qt.Assert(t, qt.IsNil(err))
+	logs := test.ObservedLogs(a)
+
+	go Run(a)
+	time.Sleep(100 * time.Millisecond)
+
+	// Signal interrupt to stop app
+	proc, err := os.FindProcess(os.Getpid())
+	qt.Assert(t, qt.IsNil(err))
+	proc.Signal(os.Interrupt)
+
+	time.Sleep(500 * time.Microsecond)
+
+	qt.Assert(t, qt.HasLen(logs.All(), 2))
+	qt.Check(t, qt.Equals(logs.All()[0].Message, "Starting Test 1.0.0..."))
+	qt.Check(t, qt.Equals(logs.All()[1].Message, "Received interrupt signal, stopping service"))
 }
