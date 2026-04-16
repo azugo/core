@@ -78,7 +78,10 @@ func TestAppLogStart(t *testing.T) {
 	qt.Assert(t, qt.IsNil(err))
 	logs := test.ObservedLogs(a)
 
-	go Run(a)
+	wg := sync.WaitGroup{}
+	wg.Go(func() {
+		Run(a)
+	})
 	time.Sleep(100 * time.Millisecond)
 
 	// Signal interrupt to stop app
@@ -86,7 +89,7 @@ func TestAppLogStart(t *testing.T) {
 	qt.Assert(t, qt.IsNil(err))
 	proc.Signal(os.Interrupt)
 
-	time.Sleep(500 * time.Microsecond)
+	wg.Wait()
 
 	qt.Assert(t, qt.HasLen(logs.All(), 2))
 	qt.Check(t, qt.Equals(logs.All()[0].Message, "Starting Test 1.0.0..."))
