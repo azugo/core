@@ -5,10 +5,9 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"go.uber.org/zap"
 )
@@ -22,26 +21,22 @@ type Runnable interface {
 	Log() *zap.Logger
 }
 
-// Run starts an application and waits for it to finish.
-func Run(a Runnable) {
-	// Catch interrupts for gracefully stopping background node proecess
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
+// Run starts an application and waits for the context to be cancelled before
+// stopping it gracefully.
+func Run(ctx context.Context, a Runnable) {
 	go func() {
 		if err := a.Start(); err != nil {
 			a.Log().With(zap.Error(err)).Fatal("Failed to start service")
 
-			return
+			os.Exit(1)
 		}
 
 		a.Log().Info(fmt.Sprintf("Starting %s...", a.String()))
 	}()
 
-	s := <-done
-	signal.Stop(done)
+	<-ctx.Done()
 
-	a.Log().Info(fmt.Sprintf("Received %s signal, stopping service", s))
+	a.Log().Info(fmt.Sprintf("Stopping %s...", a.String()))
 
 	a.Stop()
 }

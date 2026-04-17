@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"os"
+	"os/signal"
 	"sync"
 	"testing"
 	"time"
@@ -52,7 +53,10 @@ func TestApp(t *testing.T) {
 		App: a,
 	}
 
-	go Run(app)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
+	go Run(ctx, app)
 	time.Sleep(100 * time.Millisecond)
 
 	qt.Check(t, qt.IsTrue(app.Config().Ready()))
@@ -78,9 +82,12 @@ func TestAppLogStart(t *testing.T) {
 	qt.Assert(t, qt.IsNil(err))
 	logs := test.ObservedLogs(a)
 
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
 	wg := sync.WaitGroup{}
 	wg.Go(func() {
-		Run(a)
+		Run(ctx, a)
 	})
 	time.Sleep(100 * time.Millisecond)
 
@@ -93,5 +100,5 @@ func TestAppLogStart(t *testing.T) {
 
 	qt.Assert(t, qt.HasLen(logs.All(), 2))
 	qt.Check(t, qt.Equals(logs.All()[0].Message, "Starting Test 1.0.0..."))
-	qt.Check(t, qt.Equals(logs.All()[1].Message, "Received interrupt signal, stopping service"))
+	qt.Check(t, qt.Equals(logs.All()[1].Message, "Stopping Test 1.0.0..."))
 }
