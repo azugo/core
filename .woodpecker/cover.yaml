@@ -7,7 +7,7 @@ when:
 
 steps:
   - name: test
-    image: golang:1.26-alpine
+    image: golang:1.26
     pull: true
     environment:
       CGO_ENABLED: 1
