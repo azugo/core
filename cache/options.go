@@ -19,6 +19,7 @@ type cacheOptions struct {
 	KeyPrefix          string
 	Loader             func(ctx context.Context, key string) (any, error)
 	Instrumenter       instrumenter.Instrumenter
+	Serialize          bool
 }
 
 // Option for the cache instance.
@@ -27,7 +28,9 @@ type Option interface {
 }
 
 func newCacheOptions(opts ...Option) *cacheOptions {
-	opt := &cacheOptions{}
+	opt := &cacheOptions{
+		Serialize: true,
+	}
 	for _, o := range opts {
 		o.applyCache(opt)
 	}
@@ -122,4 +125,18 @@ type Instrumenter instrumenter.Instrumenter
 
 func (i Instrumenter) applyCache(c *cacheOptions) {
 	c.Instrumenter = instrumenter.Instrumenter(i)
+}
+
+// Serialize controls whether values are JSON-serialized before storage in the
+// memory cache. Serialization is enabled by default to guarantee that values
+// backed by unsafe byte-to-string conversions (e.g. from fasthttp buffers) are
+// safely copied before the underlying buffer is reused.
+//
+// Set Serialize(false) only when using the memory cache explicitly with types
+// that cannot be JSON-serialized (e.g. structs containing channels or
+// functions). Has no effect on Redis-backed caches which always serialize.
+type Serialize bool
+
+func (s Serialize) applyCache(c *cacheOptions) {
+	c.Serialize = bool(s)
 }

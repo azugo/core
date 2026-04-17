@@ -6,6 +6,7 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -13,11 +14,13 @@ import (
 	"azugo.io/core/instrumenter"
 
 	"github.com/dgraph-io/ristretto"
+	"github.com/goccy/go-json"
 )
 
 type memoryCache[T any] struct {
 	cache        *ristretto.Cache
 	ttl          time.Duration
+	serialize    bool
 	lock         sync.Mutex
 	loader       func(ctx context.Context, key string) (any, error)
 	instrumenter instrumenter.Instrumenter
@@ -49,6 +52,7 @@ func newMemoryCache[T any](opts ...Option) (Instance[T], error) {
 	return &memoryCache[T]{
 		cache:        c,
 		ttl:          opt.TTL,
+		serialize:    opt.Serialize,
 		loader:       loader,
 		instrumenter: opt.Instrumenter,
 	}, nil
@@ -70,6 +74,27 @@ func (c *memoryCache[T]) getLoader(ctx context.Context) func(string) (any, error
 	}
 }
 
+func (c *memoryCache[T]) unmarshal(value any) (T, error) {
+	if !c.serialize {
+		val, _ := value.(T)
+
+		return val, nil
+	}
+
+	val := new(T)
+
+	b, ok := value.([]byte)
+	if !ok {
+		return *val, errors.New("invalid cache value type")
+	}
+
+	if err := json.Unmarshal(b, val); err != nil {
+		return *val, fmt.Errorf("invalid cache value: %w", err)
+	}
+
+	return *val, nil
+}
+
 func (c *memoryCache[T]) Get(ctx context.Context, key string, _ ...ItemOption[T]) (T, error) {
 	finish := c.instrumenter.Observe(ctx, InstrumentationGet, key)
 
@@ -87,24 +112,24 @@ func (c *memoryCache[T]) Get(ctx context.Context, key string, _ ...ItemOption[T]
 	)
 
 	if value, found = c.cache.Get(key); found {
-		val, _ := value.(T)
+		v, err := c.unmarshal(value)
+		finish(err)
 
-		finish(nil)
-
-		return val, nil
+		return v, err
 	}
 
 	if c.loader != nil {
 		var err error
 		if value, err = c.getWithLoader(key, c.getLoader(ctx)); err != nil {
+			finish(err)
+
 			return val, err
 		}
 
-		val, _ = value.(T)
+		v, err := c.unmarshal(value)
+		finish(err)
 
-		finish(nil)
-
-		return val, nil
+		return v, err
 	}
 
 	finish(nil)
@@ -112,20 +137,37 @@ func (c *memoryCache[T]) Get(ctx context.Context, key string, _ ...ItemOption[T]
 	return val, nil
 }
 
-func (c *memoryCache[T]) set(key string, v any, ttl time.Duration) error {
+func (c *memoryCache[T]) set(key string, v T, ttl time.Duration) error {
 	if c.cache == nil {
 		return ErrCacheClosed
 	}
 
+	var (
+		stored any
+		cost   int64 = 1
+	)
+
+	if c.serialize {
+		b, err := json.Marshal(v)
+		if err != nil {
+			return fmt.Errorf("invalid cache value: %w", err)
+		}
+
+		stored = b
+		cost = int64(len(b))
+	} else {
+		stored = v
+	}
+
 	if ttl == 0 {
-		if !c.cache.Set(key, v, 1) {
+		if !c.cache.Set(key, stored, cost) {
 			return ErrCacheClosed
 		}
 
 		return nil
 	}
 
-	if !c.cache.SetWithTTL(key, v, 1, ttl) {
+	if !c.cache.SetWithTTL(key, stored, cost, ttl) {
 		return ErrCacheClosed
 	}
 
@@ -138,9 +180,22 @@ func (c *memoryCache[T]) getWithLoader(key string, loader func(string) (any, err
 		return nil, err
 	}
 
-	err = c.set(key, v, c.ttl)
+	vv, _ := v.(T)
 
-	return v, err
+	if err = c.set(key, vv, c.ttl); err != nil {
+		return nil, err
+	}
+
+	if !c.serialize {
+		return vv, nil
+	}
+
+	b, err := json.Marshal(vv)
+	if err != nil {
+		return nil, fmt.Errorf("invalid cache value: %w", err)
+	}
+
+	return b, nil
 }
 
 func (c *memoryCache[T]) Pop(ctx context.Context, key string) (T, error) {
@@ -163,11 +218,10 @@ func (c *memoryCache[T]) Pop(ctx context.Context, key string) (T, error) {
 
 	c.cache.Del(key)
 
-	val, _ = i.(T)
+	v, err := c.unmarshal(i)
+	finish(err)
 
-	finish(nil)
-
-	return val, nil
+	return v, err
 }
 
 func (c *memoryCache[T]) Set(ctx context.Context, key string, value T, opts ...ItemOption[T]) error {

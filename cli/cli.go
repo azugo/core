@@ -102,14 +102,20 @@ func Run(opts Options) {
 
 	mu.Unlock()
 
-	// Create a context that cancels on SIGINT/SIGTERM and attach it to root.
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-	root.SetContext(ctx)
+	if code := func() int {
+		// Create a context that cancels on SIGINT/SIGTERM and attach it to root.
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer cancel()
+		root.SetContext(ctx)
 
-	if err := root.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		if err := root.Execute(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
 
-		os.Exit(1)
+			return 1
+		}
+
+		return 0
+	}(); code != 0 {
+		os.Exit(code)
 	}
 }
