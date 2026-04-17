@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"azugo.io/core/instrumenter"
+
+	"go.uber.org/zap"
 )
 
 type cacheOptions struct {
@@ -20,6 +22,7 @@ type cacheOptions struct {
 	Loader             func(ctx context.Context, key string) (any, error)
 	Instrumenter       instrumenter.Instrumenter
 	Serialize          bool
+	Logger             *zap.Logger
 }
 
 // Option for the cache instance.
@@ -125,6 +128,15 @@ type Instrumenter instrumenter.Instrumenter
 
 func (i Instrumenter) applyCache(c *cacheOptions) {
 	c.Instrumenter = instrumenter.Instrumenter(i)
+}
+
+// Logger sets the logger for the cache backends. When provided, internal
+// backend log messages are forwarded to it; the zap logger's own level
+// configuration controls what is actually emitted.
+type Logger struct{ *zap.Logger }
+
+func (l Logger) applyCache(c *cacheOptions) {
+	c.Logger = l.Logger
 }
 
 // Serialize controls whether values are JSON-serialized before storage in the

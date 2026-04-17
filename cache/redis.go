@@ -19,7 +19,21 @@ import (
 
 	"github.com/goccy/go-json"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 )
+
+type redisZapLogger struct {
+	log *zap.SugaredLogger
+}
+
+func (l *redisZapLogger) Printf(_ context.Context, format string, v ...interface{}) {
+	l.log.Debugf(format, v...)
+}
+
+func setRedisLogger(logger *zap.Logger) {
+	redis.SetLogger(&redisZapLogger{log: logger.Sugar()})
+	redis.SetLogLevel(3) // debug
+}
 
 type redisCache[T any] struct {
 	con          redis.Cmdable

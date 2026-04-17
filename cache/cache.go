@@ -107,6 +107,10 @@ func (c *Cache) Start(ctx context.Context) error {
 	c.redisCon = con
 	c.redisConStr = opt.ConnectionString
 
+	if opt.Logger != nil {
+		setRedisLogger(opt.Logger)
+	}
+
 	return nil
 }
 

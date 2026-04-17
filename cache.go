@@ -17,6 +17,7 @@ func (a *App) initCache() error {
 	opts := []cache.Option{
 		conf.Type,
 		cache.Instrumenter(a.Instrumenter()),
+		cache.Logger{Logger: a.Log().Named("cache")},
 	}
 
 	if conf.TTL > 0 {
