@@ -2,6 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
+// Package cert provides utilities for loading and generating TLS certificates.
 package cert
 
 import (
@@ -72,11 +73,11 @@ func DevPEMFile(name string, dns ...string) ([]byte, []byte, error) {
 			return nil, nil, err
 		}
 
-		f, err := os.Create(path)
+		f, err := os.Create(path) //nolint:gosec
 		if err != nil {
 			return nil, nil, err
 		}
-		defer f.Close()
+		defer f.Close() //nolint:errcheck
 
 		_, _ = f.Write(cert)
 		_, _ = f.WriteString("\n")

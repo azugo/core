@@ -2,6 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
+// Package paginator provides pagination calculation utilities.
 package paginator
 
 import (
@@ -11,7 +12,7 @@ import (
 const (
 	// QueryParameterPage is URL query parameter to specify page number.
 	QueryParameterPage = "page"
-	// QueryParameterPage is URL query parameter to specify page size.
+	// QueryParameterPerPage is URL query parameter to specify page size.
 	QueryParameterPerPage = "per_page"
 	// DefaultPageSize is a default number of items per page.
 	DefaultPageSize = 20
@@ -68,6 +69,7 @@ func (p *Paginator) HasPrevious() bool {
 	return p.current > 1
 }
 
+// Previous returns the previous page number.
 func (p *Paginator) Previous() int {
 	if !p.HasPrevious() {
 		return p.current
@@ -81,6 +83,7 @@ func (p *Paginator) HasNext() bool {
 	return p.total > p.current*p.pageSize
 }
 
+// Next returns the next page number.
 func (p *Paginator) Next() int {
 	if !p.HasNext() {
 		return p.current
@@ -103,7 +106,7 @@ func (p *Paginator) Total() int {
 	return p.total
 }
 
-// TotalPage returns number of total pages.
+// TotalPages returns number of total pages.
 func (p *Paginator) TotalPages() int {
 	if p.total == 0 {
 		return 1

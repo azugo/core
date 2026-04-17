@@ -20,7 +20,7 @@ func detectContainer() (*Container, error) {
 
 		return nil, err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	s := bufio.NewScanner(f)
 	for s.Scan() {
@@ -84,7 +84,7 @@ func detectContainerV2() (*Container, error) {
 
 		return nil, err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	s := bufio.NewScanner(f)
 	for s.Scan() {

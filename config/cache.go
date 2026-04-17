@@ -2,6 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
+// Package config provides application configuration loading and binding.
 package config
 
 import (
@@ -13,6 +14,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Cache is the cache configuration section.
 type Cache struct {
 	Type             cache.Type    `mapstructure:"type" validate:"required,oneof=memory redis redis-cluster redis-sentinel"`
 	TTL              time.Duration `mapstructure:"ttl" validate:"omitempty,min=0"`

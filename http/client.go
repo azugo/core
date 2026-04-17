@@ -1,3 +1,4 @@
+// Package http provides an HTTP client with instrumentation and configuration support.
 package http
 
 import (
@@ -22,6 +23,7 @@ var (
 	strContentTypeJSON = []byte("application/json")
 )
 
+// Instrumentation operation names for HTTP client events.
 const (
 	InstrumentationRequest = "http-client-request"
 )
@@ -118,6 +120,7 @@ func defaultRetryIfErr(req *fasthttp.Request, _ int, err error) (bool, bool) {
 	return false, true
 }
 
+// NewClient creates a new HTTP client with the provided options.
 func NewClient(opt ...Option) Client {
 	opts := &options{
 		RequestModifiers:  make([]RequestFunc, 0),

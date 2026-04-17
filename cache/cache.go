@@ -2,6 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
+// Package cache provides a unified caching layer with memory and Redis backends.
 package cache
 
 import (
@@ -12,6 +13,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// Instrumentation operation names for cache events.
 const (
 	InstrumentationStart  = "cache-start"
 	InstrumentationClose  = "cache-close"
@@ -22,8 +24,10 @@ const (
 	InstrumentationDelete = "cache-delete"
 )
 
+// ErrCacheClosed is returned when an operation is attempted on a closed cache.
 var ErrCacheClosed = errors.New("cache closed")
 
+// KeyNotFoundError is returned when a cache key is not found.
 type KeyNotFoundError struct {
 	Key string
 }
@@ -121,18 +125,21 @@ func (c *Cache) Close() {
 	finish := opt.Instrumenter.Observe(context.Background(), InstrumentationClose)
 	defer finish(nil)
 
-	if opt.Type == RedisCache || opt.Type == RedisSentinelCache {
+	switch opt.Type {
+	case RedisCache, RedisSentinelCache:
 		if v, ok := c.redisCon.(*redis.Client); ok {
 			_ = v.Close()
 		}
 
 		c.redisCon = nil
-	} else if opt.Type == RedisClusterCache {
+	case RedisClusterCache:
 		if v, ok := c.redisCon.(*redis.ClusterClient); ok {
 			_ = v.Close()
 		}
 
 		c.redisCon = nil
+	case MemoryCache:
+		// nothing to close
 	}
 
 	for _, i := range c.cache {

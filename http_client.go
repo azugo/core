@@ -15,6 +15,7 @@ func (a *App) initHTTPClient() {
 	)
 }
 
+// HTTPClient returns the application HTTP client, optionally using a named configuration.
 func (a *App) HTTPClient(name ...string) (http.Client, error) {
 	a.initHTTPClient()
 

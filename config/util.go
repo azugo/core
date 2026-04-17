@@ -16,8 +16,8 @@ import (
 //	<name>_FILE - path to the file containing the secret
 func LoadRemoteSecret(name string) (string, error) {
 	path := os.Getenv(name + "_FILE")
-	if _, err := os.Stat(path); err == nil {
-		if content, err := os.ReadFile(path); err != nil {
+	if _, err := os.Stat(path); err == nil { //nolint:gosec
+		if content, err := os.ReadFile(path); err != nil { //nolint:gosec
 			return "", err
 		} else if len(content) > 0 {
 			return string(bytes.TrimSpace(content)), nil

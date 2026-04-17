@@ -11,6 +11,7 @@ import (
 // Environment type.
 type Environment string
 
+// Supported environment values.
 const (
 	EnvironmentDevelopment Environment = "Development"
 	EnvironmentStaging     Environment = "Staging"

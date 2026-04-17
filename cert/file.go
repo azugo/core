@@ -11,11 +11,11 @@ import (
 // LoadPEMFromFile loads a PEM-encoded certificate and private key from
 // the specified file.
 func LoadPEMFromFile(path string, opt ...Option) ([]byte, []byte, error) {
-	r, err := os.Open(path)
+	r, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		return nil, nil, err
 	}
-	defer r.Close()
+	defer r.Close() //nolint:errcheck
 
 	return LoadPEMFromReader(r, opt...)
 }

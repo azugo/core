@@ -100,7 +100,7 @@ func (cs ConnectionString) applyCache(c *cacheOptions) {
 	c.ConnectionString = string(cs)
 }
 
-// ConnectionString is a connection password for the cache instance.
+// ConnectionPassword is a connection password for the cache instance.
 type ConnectionPassword string
 
 func (cs ConnectionPassword) applyCache(c *cacheOptions) {

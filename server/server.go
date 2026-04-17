@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Options configures the server created by New.
 type Options struct {
 	// AppName is the name of the application.
 	AppName string

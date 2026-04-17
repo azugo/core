@@ -1,3 +1,5 @@
+// Package cli provides a global command registry and runner for building
+// cobra-based CLI applications.
 package cli
 
 import (
@@ -106,6 +108,7 @@ func Run(opts Options) {
 		// Create a context that cancels on SIGINT/SIGTERM and attach it to root.
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer cancel()
+
 		root.SetContext(ctx)
 
 		if err := root.Execute(); err != nil {

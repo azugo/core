@@ -1,3 +1,4 @@
+// Package instrumenter provides an interface for observing cache and HTTP operations.
 package instrumenter
 
 import (

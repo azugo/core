@@ -14,6 +14,7 @@ import (
 	"github.com/lafriks/pkcs8"
 )
 
+// PEM block type constants for identifying the type of PEM-encoded data.
 const (
 	PEMBlockRSAPrivateKey       = "RSA PRIVATE KEY"
 	PEMBlockECPrivateKey        = "EC PRIVATE KEY"

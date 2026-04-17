@@ -37,7 +37,7 @@ func init() {
 			return nil, fmt.Errorf("unsupported log output scheme %q", target.Scheme)
 		}
 
-		f, err := os.OpenFile(target.Path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		f, err := os.OpenFile(target.Path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open log file %q: %w", target.Path, err)
 		}

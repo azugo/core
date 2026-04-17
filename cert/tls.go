@@ -25,7 +25,7 @@ func ParseTLSCertificateFromReader(r io.Reader, opt ...Option) (*tls.Certificate
 	return LoadTLSCertificate(crt, key)
 }
 
-// ParseTLSCertificateFromReader parses a public/private key pair from a PEM encoded file.
+// ParseTLSCertificateFromFile parses a public/private key pair from a PEM encoded file.
 func ParseTLSCertificateFromFile(path string, opt ...Option) (*tls.Certificate, error) {
 	crt, key, err := LoadPEMFromFile(path, opt...)
 	if err != nil {

@@ -52,6 +52,7 @@ func (UnauthorizedError) Error() string {
 	return "unauthorized"
 }
 
+// StatusCode returns the HTTP 401 Unauthorized status code.
 func (UnauthorizedError) StatusCode() int {
 	return fasthttp.StatusUnauthorized
 }
@@ -63,6 +64,7 @@ func (ForbiddenError) Error() string {
 	return "access forbidden"
 }
 
+// StatusCode returns the HTTP 403 Forbidden status code.
 func (ForbiddenError) StatusCode() int {
 	return fasthttp.StatusForbidden
 }
@@ -80,6 +82,7 @@ func (e NotFoundError) Error() string {
 	return e.Resource + " not found"
 }
 
+// StatusCode returns the HTTP 404 Not Found status code.
 func (NotFoundError) StatusCode() int {
 	return fasthttp.StatusNotFound
 }

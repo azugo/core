@@ -55,7 +55,7 @@ func (r *Request) SetRequestURL(u string) error {
 		}
 	}
 
-	r.Request.SetRequestURI(u)
+	r.SetRequestURI(u)
 
 	return nil
 }

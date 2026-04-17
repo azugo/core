@@ -49,6 +49,7 @@ func (a *App) closeCache() {
 	a.cache.Close()
 }
 
+// Cache returns the application cache instance, initializing it on first use.
 func (a *App) Cache() *cache.Cache {
 	if a.cache == nil {
 		if err := a.initCache(); err != nil {

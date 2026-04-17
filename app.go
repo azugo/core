@@ -2,6 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
+// Package core provides the foundational application runtime for Azugo services.
 package core
 
 import (
@@ -19,6 +20,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// App is the core application instance.
 type App struct {
 	env Environment
 
@@ -56,6 +58,7 @@ type App struct {
 	AppName      string
 }
 
+// New creates a new App instance with production environment defaults.
 func New() *App {
 	ctx, stop := context.WithCancel(context.Background())
 

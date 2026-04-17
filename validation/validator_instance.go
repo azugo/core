@@ -2,12 +2,14 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
+// Package validation provides input validation utilities.
 package validation
 
 import (
 	"github.com/go-playground/validator/v10"
 )
 
+// Validate wraps the go-playground validator with azugo-specific defaults.
 type Validate struct {
 	*validator.Validate
 }

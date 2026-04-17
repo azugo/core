@@ -1,3 +1,4 @@
+// Package system provides utilities for detecting container and Kubernetes environments.
 package system
 
 import (

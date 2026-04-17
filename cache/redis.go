@@ -91,6 +91,7 @@ func parseCustomURLAttr(v string) (string, bool, error) {
 	return u.String(), insecureSkipVerify, nil
 }
 
+// ParseRedisClusterURL parses a Redis Cluster URL string into cluster client options.
 func ParseRedisClusterURL(v string) (*redis.ClusterOptions, error) {
 	v, insecureSkipVerify, err := parseCustomURLAttr(v)
 	if err != nil {
@@ -111,6 +112,7 @@ func ParseRedisClusterURL(v string) (*redis.ClusterOptions, error) {
 	return o, err
 }
 
+// ParseRedisURL parses a Redis URL string into client options.
 func ParseRedisURL(v string) (*redis.Options, error) {
 	v, insecureSkipVerify, err := parseCustomURLAttr(v)
 	if err != nil {
@@ -409,6 +411,7 @@ func (c *redisCache[T]) Close() error {
 	}
 
 	var err error
+
 	switch v := c.con.(type) {
 	case *redis.Client:
 		err = v.Close()
