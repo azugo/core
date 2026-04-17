@@ -20,3 +20,7 @@ steps:
       - apk --no-cache add git
       - go install github.com/mfridman/tparse@latest
       - tparse -all -file report.json
+    when:
+      status:
+        - failure
+        - success
