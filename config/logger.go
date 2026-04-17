@@ -32,6 +32,9 @@ type Log struct {
 	Format string `mapstructure:"format" validate:"omitempty,oneof=console json ecsjson"`
 	// Output location (defaults to stderr)
 	Output string `mapstructure:"output"`
+	// Stacktrace enables stack traces for error level and above regardless of environment.
+	// Can be set via LOG_STACKTRACE environment variable.
+	Stacktrace bool `mapstructure:"stacktrace"`
 
 	// Secondary logging output configuration.
 	Secondary *Logger `mapstructure:"secondary" validate:"omitempty"`
@@ -51,6 +54,7 @@ func (c *Log) Bind(prefix string, v *viper.Viper) {
 	_ = v.BindEnv(prefix+".level", "LOG_LEVEL")
 	_ = v.BindEnv(prefix+".format", "LOG_FORMAT")
 	_ = v.BindEnv(prefix+".output", "LOG_OUTPUT")
+	_ = v.BindEnv(prefix+".stacktrace", "LOG_STACKTRACE")
 
 	_ = v.BindEnv(prefix+".secondary.type", "LOG_TYPE_SECONDARY")
 	_ = v.BindEnv(prefix+".secondary.level", "LOG_LEVEL_SECONDARY")

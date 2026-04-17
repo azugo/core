@@ -129,10 +129,11 @@ func (a *App) initLogger() error {
 	}
 
 	if a.Env().IsDevelopment() {
-		opts = append(opts,
-			zap.Development(),
-			zap.AddStacktrace(zapcore.ErrorLevel),
-		)
+		opts = append(opts, zap.Development())
+	}
+
+	if a.Env().IsDevelopment() || conf.Stacktrace {
+		opts = append(opts, zap.AddStacktrace(zapcore.ErrorLevel))
 	}
 
 	a.logger = zap.New(core, opts...).With(a.loggerFields()...)
