@@ -17,7 +17,7 @@ steps:
     depends_on:
       - vendor
     commands:
-      - golangci-lint run --timeout 3m --out-format=checkstyle:golangci-lint.out,colored-line-number
+      - golangci-lint run --timeout 3m --output.checkstyle.path=golangci-lint.out --output.text.path=stdout
     when:
       branch: main
       event: push
