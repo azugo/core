@@ -26,7 +26,7 @@ type redisZapLogger struct {
 	log *zap.SugaredLogger
 }
 
-func (l *redisZapLogger) Printf(_ context.Context, format string, v ...interface{}) {
+func (l *redisZapLogger) Printf(_ context.Context, format string, v ...any) {
 	l.log.Debugf(format, v...)
 }
 
