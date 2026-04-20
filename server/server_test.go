@@ -56,7 +56,7 @@ func TestApp(t *testing.T) {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	go Run(ctx, app)
+	go RunContext(ctx, app)
 	time.Sleep(100 * time.Millisecond)
 
 	qt.Check(t, qt.IsTrue(app.Config().Ready()))
@@ -87,7 +87,7 @@ func TestAppLogStart(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 	wg.Go(func() {
-		Run(ctx, a)
+		RunContext(ctx, a)
 	})
 	time.Sleep(100 * time.Millisecond)
 

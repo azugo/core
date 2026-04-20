@@ -9,6 +9,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"go.uber.org/zap"
 )
@@ -22,9 +24,9 @@ type Runnable interface {
 	Log() *zap.Logger
 }
 
-// Run starts an application and waits for the context to be cancelled before
-// stopping it gracefully.
-func Run(ctx context.Context, a Runnable) {
+// RunContext starts an application and waits for the context to be cancelled
+// before stopping it gracefully.
+func RunContext(ctx context.Context, a Runnable) {
 	go func() {
 		if err := a.Start(); err != nil {
 			a.Log().With(zap.Error(err)).Fatal("Failed to start service")
@@ -40,4 +42,13 @@ func Run(ctx context.Context, a Runnable) {
 	a.Log().Info(fmt.Sprintf("Stopping %s...", a.String()))
 
 	a.Stop()
+}
+
+// Run starts an application and waits for SIGINT or SIGTERM before stopping
+// it gracefully.
+func Run(a Runnable) {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	RunContext(ctx, a)
 }
