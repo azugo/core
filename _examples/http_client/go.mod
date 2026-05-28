@@ -2,7 +2,7 @@ module azugo.io/core/example/http_client
 
 go 1.25.0
 
-require azugo.io/core v0.31.1
+require azugo.io/core v0.0.0
 
 require (
 	github.com/andybalholm/brotli v1.2.1 // indirect
