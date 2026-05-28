@@ -3,13 +3,13 @@ module azugo.io/core
 go 1.25.0
 
 require (
-	github.com/dgraph-io/ristretto v0.2.0
+	github.com/dgraph-io/ristretto/v2 v2.4.0
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/go-quicktest/qt v1.102.0
 	github.com/goccy/go-json v0.10.6
 	github.com/lafriks/pkcs8 v1.2.3
 	github.com/mattn/go-colorable v0.1.14
-	github.com/redis/go-redis/v9 v9.19.0
+	github.com/redis/go-redis/v9 v9.20.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
