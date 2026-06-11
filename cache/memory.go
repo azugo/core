@@ -62,7 +62,7 @@ func newMemoryCache[T any](opts ...Option) (Instance[T], error) {
 	if opt.Loader != nil {
 		loader := opt.Loader
 		mc.loader = func(ctx context.Context, key string) (any, error) {
-			finish := opt.Instrumenter.Observe(ctx, InstrumentationLoader, key)
+			finish := instrumenter.ObserveKey(ctx, opt.Instrumenter, InstrumentationLoader, key)
 			v, err := loader(ctx, key)
 			finish(err)
 
@@ -103,7 +103,7 @@ func (c *memoryCache[T]) loadAndCache(ctx context.Context, key string) (T, error
 }
 
 func (c *memoryCache[T]) Get(ctx context.Context, key string, _ ...ItemOption[T]) (T, error) {
-	finish := c.instrumenter.Observe(ctx, InstrumentationGet, key)
+	finish := instrumenter.ObserveKey(ctx, c.instrumenter, InstrumentationGet, key)
 
 	var val T
 
@@ -195,7 +195,7 @@ func (c *memoryCache[T]) Pop(ctx context.Context, key string) (T, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	finish := c.instrumenter.Observe(ctx, InstrumentationGet, key)
+	finish := instrumenter.ObserveKey(ctx, c.instrumenter, InstrumentationGet, key)
 
 	if c.serialize {
 		if c.serializedCache == nil {
@@ -240,7 +240,7 @@ func (c *memoryCache[T]) Pop(ctx context.Context, key string) (T, error) {
 }
 
 func (c *memoryCache[T]) Set(ctx context.Context, key string, value T, opts ...ItemOption[T]) error {
-	finish := c.instrumenter.Observe(ctx, InstrumentationSet, key)
+	finish := instrumenter.ObserveKey(ctx, c.instrumenter, InstrumentationSet, key)
 
 	opt := newItemOptions(opts...)
 
@@ -257,7 +257,7 @@ func (c *memoryCache[T]) Set(ctx context.Context, key string, value T, opts ...I
 }
 
 func (c *memoryCache[T]) Delete(ctx context.Context, key string) error {
-	finish := c.instrumenter.Observe(ctx, InstrumentationDelete, key)
+	finish := instrumenter.ObserveKey(ctx, c.instrumenter, InstrumentationDelete, key)
 	defer finish(nil)
 
 	if c.serialize {

@@ -151,6 +151,26 @@ func (c *Cache) Close() {
 	c.cache = nil
 }
 
+// Connection returns the underlying Redis connection shared by the cache.
+func (c *Cache) Connection() redis.Cmdable {
+	return c.redisCon
+}
+
+// ConfiguredType returns the cache type the cache was created with.
+func (c *Cache) ConfiguredType() Type {
+	opt := newCacheOptions(c.options...)
+	if opt.Type == "" {
+		return MemoryCache
+	}
+
+	return opt.Type
+}
+
+// ConfiguredKeyPrefix returns the global key prefix the cache was created with.
+func (c *Cache) ConfiguredKeyPrefix() string {
+	return newCacheOptions(c.options...).KeyPrefix
+}
+
 // Ping cache and all its instances.
 func (c *Cache) Ping(ctx context.Context) error {
 	opt := newCacheOptions(c.options...)
@@ -278,48 +298,4 @@ func ValidateConnectionString(typ Type, connStr string) error {
 	}
 
 	return err
-}
-
-// InstrGet returns cache key if the operation is cache get event.
-func InstrGet(op string, args ...any) (string, bool) {
-	if op != InstrumentationGet || len(args) != 1 {
-		return "", false
-	}
-
-	key, ok := args[0].(string)
-
-	return key, ok
-}
-
-// InstrSet returns cache key if the operation is cache set event.
-func InstrSet(op string, args ...any) (string, bool) {
-	if op != InstrumentationSet || len(args) != 1 {
-		return "", false
-	}
-
-	key, ok := args[0].(string)
-
-	return key, ok
-}
-
-// InstrDelete returns cache key if the operation is cache delete event.
-func InstrDelete(op string, args ...any) (string, bool) {
-	if op != InstrumentationDelete || len(args) != 1 {
-		return "", false
-	}
-
-	key, ok := args[0].(string)
-
-	return key, ok
-}
-
-// InstrLoader returns cache key if the operation is cache loader event.
-func InstrLoader(op string, args ...any) (string, bool) {
-	if op != InstrumentationLoader || len(args) != 1 {
-		return "", false
-	}
-
-	key, ok := args[0].(string)
-
-	return key, ok
 }

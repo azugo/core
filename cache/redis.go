@@ -54,7 +54,7 @@ func newRedisCache[T any](prefix string, con redis.Cmdable, opts ...Option) Inst
 	loader := opt.Loader
 	if loader != nil {
 		loader = func(ctx context.Context, key string) (any, error) {
-			finish := opt.Instrumenter.Observe(ctx, InstrumentationLoader, key)
+			finish := instrumenter.ObserveKey(ctx, opt.Instrumenter, InstrumentationLoader, key)
 			v, err := opt.Loader(ctx, key)
 			finish(err)
 
@@ -251,7 +251,7 @@ func (c *redisCache[T]) Get(ctx context.Context, key string, opts ...ItemOption[
 		return *val, ErrCacheClosed
 	}
 
-	finish := c.instrumenter.Observe(ctx, InstrumentationGet, c.prefix+key)
+	finish := instrumenter.ObserveKey(ctx, c.instrumenter, InstrumentationGet, c.prefix+key)
 	s := c.con.Get(ctx, c.prefix+key)
 
 	if errors.Is(s.Err(), redis.Nil) {
@@ -307,8 +307,8 @@ func (c *redisCache[T]) Pop(ctx context.Context, key string) (T, error) {
 		return *val, ErrCacheClosed
 	}
 
-	finishG := c.instrumenter.Observe(ctx, InstrumentationGet, c.prefix+key)
-	finishD := c.instrumenter.Observe(ctx, InstrumentationDelete, c.prefix+key)
+	finishG := instrumenter.ObserveKey(ctx, c.instrumenter, InstrumentationGet, c.prefix+key)
+	finishD := instrumenter.ObserveKey(ctx, c.instrumenter, InstrumentationDelete, c.prefix+key)
 
 	s := c.con.GetDel(ctx, c.prefix+key)
 	if errors.Is(s.Err(), redis.Nil) {
@@ -344,7 +344,7 @@ func (c *redisCache[T]) Set(ctx context.Context, key string, value T, opts ...It
 		return ErrCacheClosed
 	}
 
-	finish := c.instrumenter.Observe(ctx, InstrumentationSet, c.prefix+key)
+	finish := instrumenter.ObserveKey(ctx, c.instrumenter, InstrumentationSet, c.prefix+key)
 
 	buf, err := json.Marshal(value)
 	if err != nil {
@@ -378,7 +378,7 @@ func (c *redisCache[T]) Delete(ctx context.Context, key string) error {
 		return ErrCacheClosed
 	}
 
-	finish := c.instrumenter.Observe(ctx, InstrumentationSet, c.prefix+key)
+	finish := instrumenter.ObserveKey(ctx, c.instrumenter, InstrumentationSet, c.prefix+key)
 
 	s := c.con.Del(ctx, c.prefix+key)
 	if s.Err() != nil {
