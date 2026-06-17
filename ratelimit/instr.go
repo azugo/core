@@ -1,25 +1,39 @@
 package ratelimit
 
-// InstrAllow returns rate limiter key if the operation is allow event.
-func InstrAllow(op string, args ...any) (string, bool) {
-	if op != InstrumentationAllow || len(args) != 1 {
-		return "", false
+// InstrAllow returns the rate limiter key and the result the operation fills in
+// if op is an allow event. The result is only populated once the finish
+// callback is invoked.
+func InstrAllow(op string, args ...any) (string, *Result, bool) {
+	if op != InstrumentationAllow || len(args) != 2 {
+		return "", nil, false
 	}
 
 	key, ok := args[0].(string)
+	if !ok {
+		return "", nil, false
+	}
 
-	return key, ok
+	res, ok := args[1].(*Result)
+
+	return key, res, ok
 }
 
-// InstrPeek returns rate limiter key if the operation is peek event.
-func InstrPeek(op string, args ...any) (string, bool) {
-	if op != InstrumentationPeek || len(args) != 1 {
-		return "", false
+// InstrPeek returns the rate limiter key and the result the operation fills in
+// if op is a peek event. The result is only populated once the finish callback
+// is invoked.
+func InstrPeek(op string, args ...any) (string, *Result, bool) {
+	if op != InstrumentationPeek || len(args) != 2 {
+		return "", nil, false
 	}
 
 	key, ok := args[0].(string)
+	if !ok {
+		return "", nil, false
+	}
 
-	return key, ok
+	res, ok := args[1].(*Result)
+
+	return key, res, ok
 }
 
 // InstrWait returns rate limiter key if the operation is wait event.

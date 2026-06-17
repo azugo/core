@@ -128,8 +128,7 @@ func NewClient(opt ...Option) Client {
 		Configuration: &Configuration{
 			Clients: make(map[string]NamedClient),
 		},
-		Context:      context.Background(),
-		Instrumenter: instrumenter.NullInstrumenter,
+		Context: context.Background(),
 	}
 	opts.apply(opt)
 

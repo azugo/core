@@ -12,9 +12,14 @@ func NullFinish(error) {}
 // This function should return a function with no argument as a callback for finished execution.
 type Instrumenter func(ctx context.Context, op string, args ...any) func(err error)
 
+// Empty reports whether no instrumenter is configured (the instrumenter is nil).
+func (i Instrumenter) Empty() bool {
+	return i == nil
+}
+
 // Observe operation.
 func (i Instrumenter) Observe(ctx context.Context, op string, args ...any) func(err error) {
-	if i == nil {
+	if i.Empty() {
 		return NullFinish
 	}
 
@@ -23,16 +28,11 @@ func (i Instrumenter) Observe(ctx context.Context, op string, args ...any) func(
 
 // ObserveKey helper for instrumenting operations with a single key argument.
 func ObserveKey(ctx context.Context, i Instrumenter, op, key string) func(error) {
-	if i == nil {
+	if i.Empty() {
 		return NullFinish
 	}
 
 	return i(ctx, op, key)
-}
-
-// NullInstrumenter is a no-op instrumenter.
-func NullInstrumenter(_ context.Context, _ string, _ ...any) func(err error) {
-	return NullFinish
 }
 
 // CombinedInstrumenter is an instrumenter that combines multiple instrumenters.

@@ -45,13 +45,22 @@ func noopFinish(error) {}
 
 // observe wraps instrumenter.Observe so that the variadic argument slice and
 // interface boxing of key are not allocated when no instrumenter is
-// configured.
-func observe(ctx context.Context, instr instrumenter.Instrumenter, op, key string) func(error) {
-	if instr == nil {
+// configured. extra arguments (e.g. a *Result the operation fills in before
+// finish is called) are forwarded after the key.
+func observe(ctx context.Context, instr instrumenter.Instrumenter, op, key string, extra ...any) func(error) {
+	if instr.Empty() {
 		return noopFinish
 	}
 
-	return instr(ctx, op, key)
+	if len(extra) == 0 {
+		return instr(ctx, op, key)
+	}
+
+	args := make([]any, 0, len(extra)+1)
+	args = append(args, key)
+	args = append(args, extra...)
+
+	return instr(ctx, op, args...)
 }
 
 func normalizeKey(key string) string {
@@ -191,7 +200,9 @@ func (l *limiter) AllowN(ctx context.Context, key string, n int) (Result, error)
 
 	key = normalizeKey(key)
 
-	finish := observe(ctx, l.opt.instrumenter, InstrumentationAllow, key)
+	var res Result
+
+	finish := observe(ctx, l.opt.instrumenter, InstrumentationAllow, key, &res)
 
 	res, err := l.backend.allowN(ctx, key, n, false)
 	finish(err)
@@ -202,7 +213,9 @@ func (l *limiter) AllowN(ctx context.Context, key string, n int) (Result, error)
 func (l *limiter) Peek(ctx context.Context, key string) (Result, error) {
 	key = normalizeKey(key)
 
-	finish := observe(ctx, l.opt.instrumenter, InstrumentationPeek, key)
+	var res Result
+
+	finish := observe(ctx, l.opt.instrumenter, InstrumentationPeek, key, &res)
 
 	res, err := l.backend.allowN(ctx, key, 1, true)
 	finish(err)

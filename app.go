@@ -70,8 +70,6 @@ func New() *App {
 
 		tasks: make([]Tasker, 0),
 
-		instrumenter: instrumenter.NullInstrumenter,
-
 		validate: validation.New(),
 	}
 }
@@ -131,18 +129,14 @@ func (a *App) Config() *config.Configuration {
 	return a.config
 }
 
-// Instrumentation defines callback to be used as instrumenter.
+// Instrumentation defines callback to be used as instrumenter. Passing nil
+// disables instrumentation.
 func (a *App) Instrumentation(instr instrumenter.Instrumenter) {
-	if instr == nil {
-		a.instrumenter = instrumenter.NullInstrumenter
-
-		return
-	}
-
 	a.instrumenter = instr
 }
 
-// Instrumenter returns application instrumentation callback.
+// Instrumenter returns application instrumentation callback. It is nil (Empty)
+// when no instrumentation is configured.
 func (a *App) Instrumenter() instrumenter.Instrumenter {
 	return a.instrumenter
 }
