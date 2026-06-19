@@ -77,20 +77,24 @@ func newMemoryLimiter(opt *options) *memoryLimiter {
 	}
 }
 
-func (m *memoryLimiter) allowN(_ context.Context, key string, n int, peek bool) (Result, error) {
+func (m *memoryLimiter) allowN(_ context.Context, key string, n int, peek bool, limit int) (Result, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	m.cleanup()
 
 	if m.opt.strategy == strategyFixedWindow {
-		return m.fixedWindow(key, n, peek), nil
+		return m.fixedWindow(key, n, peek, limit), nil
 	}
 
-	return m.tokenBucket(key, n, peek), nil
+	return m.tokenBucket(key, n, peek, limit), nil
 }
 
-func (m *memoryLimiter) fixedWindow(key string, n int, peek bool) Result {
+func (m *memoryLimiter) fixedWindow(key string, n int, peek bool, limit int) Result {
+	if limit <= 0 {
+		limit = m.opt.limit
+	}
+
 	now := time.Now()
 
 	e := m.windows[key]
@@ -108,9 +112,9 @@ func (m *memoryLimiter) fixedWindow(key string, n int, peek bool) Result {
 		resetAt = e.resetAt
 	}
 
-	remaining := max(m.opt.limit-count, 0)
+	remaining := max(limit-count, 0)
 
-	if n > m.opt.limit-count {
+	if n > limit-count {
 		return Result{
 			Remaining:  remaining,
 			RetryAfter: resetAt.Sub(now),
@@ -131,15 +135,20 @@ func (m *memoryLimiter) fixedWindow(key string, n int, peek bool) Result {
 
 	e.count += n
 
-	return Result{Allowed: true, Remaining: m.opt.limit - e.count, ResetAt: resetAt}
+	return Result{Allowed: true, Remaining: limit - e.count, ResetAt: resetAt}
 }
 
 // tokenBucket implements the generic cell rate algorithm (GCRA).
-func (m *memoryLimiter) tokenBucket(key string, n int, peek bool) Result {
+func (m *memoryLimiter) tokenBucket(key string, n int, peek bool, limit int) Result {
+	burst := m.opt.burst
+	if limit > 0 {
+		burst = limit
+	}
+
 	now := time.Now()
 
 	emission := max(time.Duration(float64(time.Second)/m.opt.rate), 1)
-	tau := time.Duration(m.opt.burst) * emission
+	tau := time.Duration(burst) * emission
 
 	tat, ok := m.tats[key]
 	if !ok || tat.Before(now) {
@@ -147,9 +156,9 @@ func (m *memoryLimiter) tokenBucket(key string, n int, peek bool) Result {
 	}
 
 	remaining := int(now.Sub(tat.Add(-tau)) / emission)
-	remaining = min(max(remaining, 0), m.opt.burst)
+	remaining = min(max(remaining, 0), burst)
 
-	if n > m.opt.burst {
+	if n > burst {
 		return Result{
 			Remaining:  remaining,
 			RetryAfter: tat.Sub(now) + emission,

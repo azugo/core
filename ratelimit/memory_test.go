@@ -443,7 +443,7 @@ func BenchmarkMemorySemaphore(b *testing.B) {
 
 type failingBackend struct{}
 
-func (failingBackend) allowN(_ context.Context, _ string, _ int, _ bool) (Result, error) {
+func (failingBackend) allowN(_ context.Context, _ string, _ int, _ bool, _ int) (Result, error) {
 	return Result{}, errors.New("backend unavailable")
 }
 

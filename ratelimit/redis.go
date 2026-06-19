@@ -190,17 +190,21 @@ func newRedisLimiter(con redis.Cmdable, prefix string, opt *options) *redisLimit
 	return r
 }
 
-func (r *redisLimiter) allowN(ctx context.Context, key string, n int, peek bool) (Result, error) {
+func (r *redisLimiter) allowN(ctx context.Context, key string, n int, peek bool, limit int) (Result, error) {
 	if r.opt.strategy == strategyFixedWindow {
-		return r.fixedWindow(ctx, key, n, peek)
+		return r.fixedWindow(ctx, key, n, peek, limit)
 	}
 
-	return r.tokenBucket(ctx, key, n, peek)
+	return r.tokenBucket(ctx, key, n, peek, limit)
 }
 
-func (r *redisLimiter) fixedWindow(ctx context.Context, key string, n int, peek bool) (Result, error) {
+func (r *redisLimiter) fixedWindow(ctx context.Context, key string, n int, peek bool, limit int) (Result, error) {
+	if limit <= 0 {
+		limit = r.opt.limit
+	}
+
 	vals, err := fixedWindowScript.Run(ctx, r.con, []string{r.prefix + key},
-		r.opt.limit, r.opt.window.Milliseconds(), n, peek).Slice()
+		limit, r.opt.window.Milliseconds(), n, peek).Slice()
 	if err != nil {
 		return Result{}, err
 	}
@@ -208,9 +212,17 @@ func (r *redisLimiter) fixedWindow(ctx context.Context, key string, n int, peek 
 	return parseLimiterReply(vals)
 }
 
-func (r *redisLimiter) tokenBucket(ctx context.Context, key string, n int, peek bool) (Result, error) {
+func (r *redisLimiter) tokenBucket(ctx context.Context, key string, n int, peek bool, limit int) (Result, error) {
+	burst := r.opt.burst
+	tauArg := r.tauArg
+
+	if limit > 0 {
+		burst = limit
+		tauArg = strconv.FormatFloat((1000/r.opt.rate)*float64(burst), 'f', -1, 64)
+	}
+
 	vals, err := tokenBucketScript.Run(ctx, r.con, []string{r.prefix + key},
-		r.emissionArg, r.tauArg, n, r.opt.burst, peek).Slice()
+		r.emissionArg, tauArg, n, burst, peek).Slice()
 	if err != nil {
 		return Result{}, err
 	}

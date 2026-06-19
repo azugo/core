@@ -94,6 +94,10 @@ type Limiter interface {
 	// right now. Requesting more events than the configured limit or burst
 	// is always denied.
 	AllowN(ctx context.Context, key string, n int) (Result, error)
+	// AllowLimit consumes one event for key if it is permitted right now
+	// using custom limit.
+	// Provide zero limit to use configured default limit.
+	AllowLimit(ctx context.Context, key string, limit int) (Result, error)
 	// Peek reports the current state for key without consuming any events.
 	Peek(ctx context.Context, key string) (Result, error)
 	// Wait blocks until one event for key is permitted and consumes it.
@@ -106,7 +110,7 @@ type Limiter interface {
 }
 
 type limiterBackend interface {
-	allowN(ctx context.Context, key string, n int, peek bool) (Result, error)
+	allowN(ctx context.Context, key string, n int, peek bool, limit int) (Result, error)
 	reset(ctx context.Context, key string) error
 }
 
@@ -204,7 +208,20 @@ func (l *limiter) AllowN(ctx context.Context, key string, n int) (Result, error)
 
 	finish := observe(ctx, l.opt.instrumenter, InstrumentationAllow, key, &res)
 
-	res, err := l.backend.allowN(ctx, key, n, false)
+	res, err := l.backend.allowN(ctx, key, n, false, 0)
+	finish(err)
+
+	return l.failOpen(res, err)
+}
+
+func (l *limiter) AllowLimit(ctx context.Context, key string, limit int) (Result, error) {
+	key = normalizeKey(key)
+
+	var res Result
+
+	finish := observe(ctx, l.opt.instrumenter, InstrumentationAllow, key, &res)
+
+	res, err := l.backend.allowN(ctx, key, 1, false, limit)
 	finish(err)
 
 	return l.failOpen(res, err)
@@ -217,7 +234,7 @@ func (l *limiter) Peek(ctx context.Context, key string) (Result, error) {
 
 	finish := observe(ctx, l.opt.instrumenter, InstrumentationPeek, key, &res)
 
-	res, err := l.backend.allowN(ctx, key, 1, true)
+	res, err := l.backend.allowN(ctx, key, 1, true, 0)
 	finish(err)
 
 	return l.failOpen(res, err)
@@ -229,7 +246,7 @@ func (l *limiter) Wait(ctx context.Context, key string) error {
 	finish := observe(ctx, l.opt.instrumenter, InstrumentationWait, key)
 
 	err := waitLoop(ctx, l.opt.waitLimit, 0, func(ctx context.Context) (bool, time.Duration, error) {
-		res, err := l.failOpen(l.backend.allowN(ctx, key, 1, false))
+		res, err := l.failOpen(l.backend.allowN(ctx, key, 1, false, 0))
 		if err != nil {
 			return false, 0, err
 		}
