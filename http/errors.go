@@ -2,8 +2,6 @@ package http
 
 import (
 	"strings"
-
-	"github.com/valyala/fasthttp"
 )
 
 // ErrorResponseError is an error response error details.
@@ -54,7 +52,7 @@ func (UnauthorizedError) Error() string {
 
 // StatusCode returns the HTTP 401 Unauthorized status code.
 func (UnauthorizedError) StatusCode() int {
-	return fasthttp.StatusUnauthorized
+	return StatusUnauthorized
 }
 
 // ForbiddenError is an error that occurs when user access is denied.
@@ -66,7 +64,7 @@ func (ForbiddenError) Error() string {
 
 // StatusCode returns the HTTP 403 Forbidden status code.
 func (ForbiddenError) StatusCode() int {
-	return fasthttp.StatusForbidden
+	return StatusForbidden
 }
 
 // NotFoundError is an error that occurs when searched resource is not found.
@@ -84,5 +82,5 @@ func (e NotFoundError) Error() string {
 
 // StatusCode returns the HTTP 404 Not Found status code.
 func (NotFoundError) StatusCode() int {
-	return fasthttp.StatusNotFound
+	return StatusNotFound
 }

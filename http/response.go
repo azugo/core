@@ -30,11 +30,11 @@ func (r Response) Error() error {
 	}
 
 	switch r.StatusCode() {
-	case fasthttp.StatusForbidden:
+	case StatusForbidden:
 		return ForbiddenError{}
-	case fasthttp.StatusNotFound:
+	case StatusNotFound:
 		return NotFoundError{}
-	case fasthttp.StatusUnauthorized:
+	case StatusUnauthorized:
 		return UnauthorizedError{}
 	default:
 		body, _ := r.BodyUncompressed()

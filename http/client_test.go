@@ -54,22 +54,22 @@ func TestGetRequest(t *testing.T) {
 	s := newTestHttpServer()
 	s.Handler = func(ctx *fasthttp.RequestCtx) {
 		if string(ctx.UserAgent()) != "Azugo/dev" {
-			ctx.SetStatusCode(fasthttp.StatusTeapot)
+			ctx.SetStatusCode(StatusTeapot)
 			return
 		}
 
-		if string(ctx.Request.Header.Method()) != fasthttp.MethodGet {
-			ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
+		if !Method(ctx.Request.Header.Method()).IsGet() {
+			ctx.SetStatusCode(StatusMethodNotAllowed)
 			return
 		}
 
 		if string(ctx.QueryArgs().Peek("name")) != "John Doe" {
-			ctx.SetStatusCode(fasthttp.StatusBadRequest)
+			ctx.SetStatusCode(StatusBadRequest)
 			return
 		}
 
 		ctx.SetBodyString("Hello World")
-		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetStatusCode(StatusOK)
 	}
 	s.Start()
 	defer s.Stop()
@@ -83,14 +83,14 @@ func TestGetRequest(t *testing.T) {
 func TestGetJSONRequest(t *testing.T) {
 	s := newTestHttpServer()
 	s.Handler = func(ctx *fasthttp.RequestCtx) {
-		if string(ctx.Request.Header.Method()) != fasthttp.MethodGet {
-			ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
+		if !Method(ctx.Request.Header.Method()).IsGet() {
+			ctx.SetStatusCode(StatusMethodNotAllowed)
 			return
 		}
 
 		ctx.SetContentTypeBytes(strContentTypeJSON)
 		ctx.SetBodyString(`{"date":"2023-12-01", "message":"Hello World"}`)
-		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetStatusCode(StatusOK)
 	}
 	s.Start()
 	defer s.Stop()
@@ -108,32 +108,134 @@ func TestGetJSONRequest(t *testing.T) {
 	qt.Check(t, qt.Equals(ret.Message, "Hello World"))
 }
 
-func TestPostRequest(t *testing.T) {
+func TestQueryRequest(t *testing.T) {
 	s := newTestHttpServer()
 	s.Handler = func(ctx *fasthttp.RequestCtx) {
-		if string(ctx.Request.Header.Method()) != fasthttp.MethodPost {
-			ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
+		if !Method(ctx.Request.Header.Method()).IsQuery() {
+			ctx.SetStatusCode(StatusMethodNotAllowed)
 			return
 		}
 
 		if !bytes.Equal(ctx.Request.Header.ContentType(), strContentTypeJSON) {
-			ctx.SetStatusCode(fasthttp.StatusUnprocessableEntity)
+			ctx.SetStatusCode(StatusUnprocessableEntity)
 			return
 		}
 
 		if string(ctx.Request.Body()) != `{"message":"Hello World"}` {
-			ctx.SetStatusCode(fasthttp.StatusBadRequest)
+			ctx.SetStatusCode(StatusBadRequest)
 			return
 		}
 
 		ctx.SetBodyString("OK")
-		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetStatusCode(StatusOK)
 	}
 	s.Start()
 	defer s.Stop()
 
 	c := NewClient(s.DialContext())
-	resp, err := c.Post("http://localhost:8080", []byte(`{"message":"Hello World"}`), WithHeader(fasthttp.HeaderContentType, "application/json"))
+	resp, err := c.Query("http://localhost:8080", []byte(`{"message":"Hello World"}`), WithHeader(HeaderContentType, ContentTypeJSON))
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(string(resp), "OK"))
+}
+
+func TestQueryJSONRequest(t *testing.T) {
+	s := newTestHttpServer()
+	s.Handler = func(ctx *fasthttp.RequestCtx) {
+		if !Method(ctx.Request.Header.Method()).IsQuery() {
+			ctx.SetStatusCode(StatusMethodNotAllowed)
+			return
+		}
+
+		if !bytes.Equal(ctx.Request.Header.ContentType(), strContentTypeJSON) {
+			ctx.SetStatusCode(StatusUnprocessableEntity)
+			return
+		}
+
+		if string(ctx.Request.Body()) != `{"message":"Hello World"}` {
+			ctx.SetStatusCode(StatusBadRequest)
+			return
+		}
+
+		ctx.SetContentTypeBytes(strContentTypeJSON)
+		ctx.SetBodyString(`{"status":true}`)
+		ctx.SetStatusCode(StatusOK)
+	}
+	s.Start()
+	defer s.Stop()
+
+	c := NewClient(s.DialContext())
+	req := struct {
+		Message string `json:"message"`
+	}{
+		Message: "Hello World",
+	}
+
+	resp := struct {
+		Status bool `json:"status"`
+	}{}
+
+	err := c.QueryJSON("http://localhost:8080", req, &resp)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(resp.Status))
+}
+
+func TestQueryFormRequest(t *testing.T) {
+	s := newTestHttpServer()
+	s.Handler = func(ctx *fasthttp.RequestCtx) {
+		if !Method(ctx.Request.Header.Method()).IsQuery() {
+			ctx.SetStatusCode(StatusMethodNotAllowed)
+			return
+		}
+
+		if string(ctx.Request.Header.ContentType()) != ContentTypeFormURLEncoded {
+			ctx.SetStatusCode(StatusUnprocessableEntity)
+			return
+		}
+
+		if string(ctx.Request.PostArgs().Peek("message")) != "Hello World" {
+			ctx.SetStatusCode(StatusBadRequest)
+			return
+		}
+
+		ctx.SetBodyString("OK")
+		ctx.SetStatusCode(StatusOK)
+	}
+
+	s.Start()
+	defer s.Stop()
+
+	c := NewClient(s.DialContext())
+	resp, err := c.QueryForm("http://localhost:8080", map[string][]string{"message": {"Hello World"}})
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(string(resp), "OK"))
+}
+
+func TestPostRequest(t *testing.T) {
+	s := newTestHttpServer()
+	s.Handler = func(ctx *fasthttp.RequestCtx) {
+		if !Method(ctx.Request.Header.Method()).IsPost() {
+			ctx.SetStatusCode(StatusMethodNotAllowed)
+			return
+		}
+
+		if !bytes.Equal(ctx.Request.Header.ContentType(), strContentTypeJSON) {
+			ctx.SetStatusCode(StatusUnprocessableEntity)
+			return
+		}
+
+		if string(ctx.Request.Body()) != `{"message":"Hello World"}` {
+			ctx.SetStatusCode(StatusBadRequest)
+			return
+		}
+
+		ctx.SetBodyString("OK")
+		ctx.SetStatusCode(StatusOK)
+	}
+	s.Start()
+	defer s.Stop()
+
+	c := NewClient(s.DialContext())
+	resp, err := c.Post("http://localhost:8080", []byte(`{"message":"Hello World"}`), WithHeader(HeaderContentType, ContentTypeJSON))
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(string(resp), "OK"))
 }
@@ -141,24 +243,24 @@ func TestPostRequest(t *testing.T) {
 func TestPostJSONRequest(t *testing.T) {
 	s := newTestHttpServer()
 	s.Handler = func(ctx *fasthttp.RequestCtx) {
-		if string(ctx.Request.Header.Method()) != fasthttp.MethodPost {
-			ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
+		if !Method(ctx.Request.Header.Method()).IsPost() {
+			ctx.SetStatusCode(StatusMethodNotAllowed)
 			return
 		}
 
 		if !bytes.Equal(ctx.Request.Header.ContentType(), strContentTypeJSON) {
-			ctx.SetStatusCode(fasthttp.StatusUnprocessableEntity)
+			ctx.SetStatusCode(StatusUnprocessableEntity)
 			return
 		}
 
 		if string(ctx.Request.Body()) != `{"message":"Hello World"}` {
-			ctx.SetStatusCode(fasthttp.StatusBadRequest)
+			ctx.SetStatusCode(StatusBadRequest)
 			return
 		}
 
 		ctx.SetContentTypeBytes(strContentTypeJSON)
 		ctx.SetBodyString(`{"status":true}`)
-		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetStatusCode(StatusOK)
 	}
 	s.Start()
 	defer s.Stop()
@@ -182,23 +284,23 @@ func TestPostJSONRequest(t *testing.T) {
 func TestPostFormRequest(t *testing.T) {
 	s := newTestHttpServer()
 	s.Handler = func(ctx *fasthttp.RequestCtx) {
-		if string(ctx.Request.Header.Method()) != fasthttp.MethodPost {
-			ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
+		if !Method(ctx.Request.Header.Method()).IsPost() {
+			ctx.SetStatusCode(StatusMethodNotAllowed)
 			return
 		}
 
-		if string(ctx.Request.Header.ContentType()) != "application/x-www-form-urlencoded" {
-			ctx.SetStatusCode(fasthttp.StatusUnprocessableEntity)
+		if string(ctx.Request.Header.ContentType()) != ContentTypeFormURLEncoded {
+			ctx.SetStatusCode(StatusUnprocessableEntity)
 			return
 		}
 
 		if string(ctx.Request.PostArgs().Peek("message")) != "Hello World" {
-			ctx.SetStatusCode(fasthttp.StatusBadRequest)
+			ctx.SetStatusCode(StatusBadRequest)
 			return
 		}
 
 		ctx.SetBodyString("OK")
-		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetStatusCode(StatusOK)
 	}
 
 	s.Start()
@@ -213,28 +315,28 @@ func TestPostFormRequest(t *testing.T) {
 func TestPostMultipartFormRequest(t *testing.T) {
 	s := newTestHttpServer()
 	s.Handler = func(ctx *fasthttp.RequestCtx) {
-		if string(ctx.Request.Header.Method()) != fasthttp.MethodPost {
-			ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
+		if !Method(ctx.Request.Header.Method()).IsPost() {
+			ctx.SetStatusCode(StatusMethodNotAllowed)
 			return
 		}
 
-		if !strings.HasPrefix(string(ctx.Request.Header.ContentType()), "multipart/form-data") {
-			ctx.SetStatusCode(fasthttp.StatusUnprocessableEntity)
+		if !strings.HasPrefix(string(ctx.Request.Header.ContentType()), ContentTypeMultipartFormData) {
+			ctx.SetStatusCode(StatusUnprocessableEntity)
 			return
 		}
 
 		form, err := ctx.Request.MultipartForm()
 		if err != nil {
-			ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+			ctx.SetStatusCode(StatusInternalServerError)
 			return
 		}
 		if form.Value["message"][0] != "Hello World" {
-			ctx.SetStatusCode(fasthttp.StatusBadRequest)
+			ctx.SetStatusCode(StatusBadRequest)
 			return
 		}
 
 		ctx.SetBodyString("OK")
-		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetStatusCode(StatusOK)
 	}
 	s.Start()
 	defer s.Stop()
@@ -253,29 +355,29 @@ func TestPostMultipartFormRequest(t *testing.T) {
 func TestPutRequest(t *testing.T) {
 	s := newTestHttpServer()
 	s.Handler = func(ctx *fasthttp.RequestCtx) {
-		if string(ctx.Request.Header.Method()) != fasthttp.MethodPut {
-			ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
+		if !Method(ctx.Request.Header.Method()).IsPut() {
+			ctx.SetStatusCode(StatusMethodNotAllowed)
 			return
 		}
 
 		if !bytes.Equal(ctx.Request.Header.ContentType(), strContentTypeJSON) {
-			ctx.SetStatusCode(fasthttp.StatusUnprocessableEntity)
+			ctx.SetStatusCode(StatusUnprocessableEntity)
 			return
 		}
 
 		if string(ctx.Request.Body()) != `{"message":"Hello World"}` {
-			ctx.SetStatusCode(fasthttp.StatusBadRequest)
+			ctx.SetStatusCode(StatusBadRequest)
 			return
 		}
 
 		ctx.SetBodyString("OK")
-		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetStatusCode(StatusOK)
 	}
 	s.Start()
 	defer s.Stop()
 
 	c := NewClient(s.DialContext())
-	resp, err := c.Put("http://localhost:8080", []byte(`{"message":"Hello World"}`), WithHeader(fasthttp.HeaderContentType, "application/json"))
+	resp, err := c.Put("http://localhost:8080", []byte(`{"message":"Hello World"}`), WithHeader(HeaderContentType, ContentTypeJSON))
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(string(resp), "OK"))
 }
@@ -283,24 +385,24 @@ func TestPutRequest(t *testing.T) {
 func TestPutJSONRequest(t *testing.T) {
 	s := newTestHttpServer()
 	s.Handler = func(ctx *fasthttp.RequestCtx) {
-		if string(ctx.Request.Header.Method()) != fasthttp.MethodPut {
-			ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
+		if !Method(ctx.Request.Header.Method()).IsPut() {
+			ctx.SetStatusCode(StatusMethodNotAllowed)
 			return
 		}
 
 		if !bytes.Equal(ctx.Request.Header.ContentType(), strContentTypeJSON) {
-			ctx.SetStatusCode(fasthttp.StatusUnprocessableEntity)
+			ctx.SetStatusCode(StatusUnprocessableEntity)
 			return
 		}
 
 		if string(ctx.Request.Body()) != `{"message":"Hello World"}` {
-			ctx.SetStatusCode(fasthttp.StatusBadRequest)
+			ctx.SetStatusCode(StatusBadRequest)
 			return
 		}
 
 		ctx.SetContentTypeBytes(strContentTypeJSON)
 		ctx.SetBodyString(`{"status":true}`)
-		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetStatusCode(StatusOK)
 	}
 	s.Start()
 	defer s.Stop()
@@ -324,29 +426,29 @@ func TestPutJSONRequest(t *testing.T) {
 func TestPatchRequest(t *testing.T) {
 	s := newTestHttpServer()
 	s.Handler = func(ctx *fasthttp.RequestCtx) {
-		if string(ctx.Request.Header.Method()) != fasthttp.MethodPatch {
-			ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
+		if !Method(ctx.Request.Header.Method()).IsPatch() {
+			ctx.SetStatusCode(StatusMethodNotAllowed)
 			return
 		}
 
 		if !bytes.Equal(ctx.Request.Header.ContentType(), strContentTypeJSON) {
-			ctx.SetStatusCode(fasthttp.StatusUnprocessableEntity)
+			ctx.SetStatusCode(StatusUnprocessableEntity)
 			return
 		}
 
 		if string(ctx.Request.Body()) != `{"message":"Hello World"}` {
-			ctx.SetStatusCode(fasthttp.StatusBadRequest)
+			ctx.SetStatusCode(StatusBadRequest)
 			return
 		}
 
 		ctx.SetBodyString("OK")
-		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetStatusCode(StatusOK)
 	}
 	s.Start()
 	defer s.Stop()
 
 	c := NewClient(s.DialContext())
-	resp, err := c.Patch("http://localhost:8080", []byte(`{"message":"Hello World"}`), WithHeader(fasthttp.HeaderContentType, "application/json"))
+	resp, err := c.Patch("http://localhost:8080", []byte(`{"message":"Hello World"}`), WithHeader(HeaderContentType, ContentTypeJSON))
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(string(resp), "OK"))
 }
@@ -354,24 +456,24 @@ func TestPatchRequest(t *testing.T) {
 func TestPatchJSONRequest(t *testing.T) {
 	s := newTestHttpServer()
 	s.Handler = func(ctx *fasthttp.RequestCtx) {
-		if string(ctx.Request.Header.Method()) != fasthttp.MethodPatch {
-			ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
+		if !Method(ctx.Request.Header.Method()).IsPatch() {
+			ctx.SetStatusCode(StatusMethodNotAllowed)
 			return
 		}
 
 		if !bytes.Equal(ctx.Request.Header.ContentType(), strContentTypeJSON) {
-			ctx.SetStatusCode(fasthttp.StatusUnprocessableEntity)
+			ctx.SetStatusCode(StatusUnprocessableEntity)
 			return
 		}
 
 		if string(ctx.Request.Body()) != `{"message":"Hello World"}` {
-			ctx.SetStatusCode(fasthttp.StatusBadRequest)
+			ctx.SetStatusCode(StatusBadRequest)
 			return
 		}
 
 		ctx.SetContentTypeBytes(strContentTypeJSON)
 		ctx.SetBodyString(`{"status":true}`)
-		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetStatusCode(StatusOK)
 	}
 	s.Start()
 	defer s.Stop()
@@ -395,12 +497,12 @@ func TestPatchJSONRequest(t *testing.T) {
 func TestDeleteRequest(t *testing.T) {
 	s := newTestHttpServer()
 	s.Handler = func(ctx *fasthttp.RequestCtx) {
-		if string(ctx.Request.Header.Method()) != fasthttp.MethodDelete {
-			ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
+		if !Method(ctx.Request.Header.Method()).IsDelete() {
+			ctx.SetStatusCode(StatusMethodNotAllowed)
 			return
 		}
 
-		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetStatusCode(StatusOK)
 	}
 	s.Start()
 	defer s.Stop()
@@ -413,24 +515,24 @@ func TestDeleteRequest(t *testing.T) {
 func TestDeleteJSONRequest(t *testing.T) {
 	s := newTestHttpServer()
 	s.Handler = func(ctx *fasthttp.RequestCtx) {
-		if string(ctx.Request.Header.Method()) != fasthttp.MethodDelete {
-			ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
+		if !Method(ctx.Request.Header.Method()).IsDelete() {
+			ctx.SetStatusCode(StatusMethodNotAllowed)
 			return
 		}
 
 		if !bytes.Equal(ctx.Request.Header.ContentType(), strContentTypeJSON) {
-			ctx.SetStatusCode(fasthttp.StatusUnprocessableEntity)
+			ctx.SetStatusCode(StatusUnprocessableEntity)
 			return
 		}
 
 		if string(ctx.Request.Body()) != `{"message":"Hello World"}` {
-			ctx.SetStatusCode(fasthttp.StatusBadRequest)
+			ctx.SetStatusCode(StatusBadRequest)
 			return
 		}
 
 		ctx.SetContentTypeBytes(strContentTypeJSON)
 		ctx.SetBodyString(`{"status":true}`)
-		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetStatusCode(StatusOK)
 	}
 	s.Start()
 	defer s.Stop()
@@ -455,11 +557,11 @@ func TestWithAuthorizationHeader(t *testing.T) {
 	s := newTestHttpServer()
 	s.Handler = func(ctx *fasthttp.RequestCtx) {
 		if auth := ctx.Request.Header.Peek("Authorization"); auth == nil || string(auth) != "Bearer 123456" {
-			ctx.SetStatusCode(fasthttp.StatusUnauthorized)
+			ctx.SetStatusCode(StatusUnauthorized)
 			return
 		}
 		ctx.SetBodyString("Hello World")
-		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetStatusCode(StatusOK)
 	}
 	s.Start()
 	defer s.Stop()
@@ -476,7 +578,7 @@ func TestInstrumentation(t *testing.T) {
 	s := newTestHttpServer()
 	s.Handler = func(ctx *fasthttp.RequestCtx) {
 		time.Sleep(delay)
-		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetStatusCode(StatusOK)
 	}
 	s.Start()
 	defer s.Stop()
@@ -498,7 +600,7 @@ func TestInstrumentation(t *testing.T) {
 func TestClientRequestReuse(t *testing.T) {
 	s := newTestHttpServer()
 	s.Handler = func(ctx *fasthttp.RequestCtx) {
-		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetStatusCode(StatusOK)
 	}
 	s.Start()
 	defer s.Stop()
@@ -516,7 +618,7 @@ func TestClientRequestReuse(t *testing.T) {
 func TestClientWithConfiguration(t *testing.T) {
 	s := newTestHttpServer()
 	s.Handler = func(ctx *fasthttp.RequestCtx) {
-		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetStatusCode(StatusOK)
 	}
 	s.Start()
 	defer s.Stop()

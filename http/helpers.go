@@ -59,6 +59,61 @@ func (c client) GetJSON(url string, v any, opt ...RequestOption) error {
 	return nil
 }
 
+// Query performs a QUERY request to the specified URL.
+//
+// Request content must have a media type set using the WithHeader Content-Type option (RFC 10008, Section 2.1).
+// From this point onward the body argument must not be changed.
+func (c client) Query(url string, body []byte, opt ...RequestOption) ([]byte, error) {
+	req := c.NewRequest()
+	if err := req.SetRequestURL(url); err != nil {
+		return nil, err
+	}
+
+	req.apply(opt)
+
+	req.Header.SetMethod(MethodQuery.String())
+	req.SetBodyRaw(body)
+
+	return c.call(req)
+}
+
+// QueryJSON performs a QUERY request to the specified URL and unmarshals the response into v.
+func (c client) QueryJSON(url string, body, v any, opt ...RequestOption) error {
+	reqBody, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+
+	opt = append([]RequestOption{WithHeader(HeaderContentType, ContentTypeJSON)}, opt...)
+
+	resp, err := c.Query(url, reqBody, opt...)
+	if err != nil {
+		return err
+	}
+
+	if len(resp) > 0 {
+		return json.Unmarshal(resp, v)
+	}
+
+	return nil
+}
+
+// QueryForm performs a QUERY request to the specified URL with the specified form values encoded with URL encoding.
+func (c client) QueryForm(url string, form map[string][]string, opt ...RequestOption) ([]byte, error) {
+	args := fasthttp.AcquireArgs()
+	defer fasthttp.ReleaseArgs(args)
+
+	for k, v := range form {
+		for _, vv := range v {
+			args.Add(k, vv)
+		}
+	}
+
+	opt = append([]RequestOption{WithHeader(HeaderContentType, ContentTypeFormURLEncoded)}, opt...)
+
+	return c.Query(url, args.QueryString(), opt...)
+}
+
 // Post performs a POST request to the specified URL.
 //
 // From this point onward the body argument must not be changed.
@@ -70,7 +125,7 @@ func (c client) Post(url string, body []byte, opt ...RequestOption) ([]byte, err
 
 	req.apply(opt)
 
-	req.Header.SetMethod(fasthttp.MethodPost)
+	req.Header.SetMethod(MethodPost.String())
 	req.SetBodyRaw(body)
 
 	return c.call(req)
@@ -83,7 +138,7 @@ func (c client) PostJSON(url string, body, v any, opt ...RequestOption) error {
 		return err
 	}
 
-	opt = append([]RequestOption{WithHeader(fasthttp.HeaderContentType, "application/json")}, opt...)
+	opt = append([]RequestOption{WithHeader(HeaderContentType, ContentTypeJSON)}, opt...)
 
 	resp, err := c.Post(url, reqBody, opt...)
 	if err != nil {
@@ -108,7 +163,7 @@ func (c client) PostForm(url string, form map[string][]string, opt ...RequestOpt
 		}
 	}
 
-	opt = append([]RequestOption{WithHeader(fasthttp.HeaderContentType, "application/x-www-form-urlencoded")}, opt...)
+	opt = append([]RequestOption{WithHeader(HeaderContentType, ContentTypeFormURLEncoded)}, opt...)
 
 	return c.Post(url, args.QueryString(), opt...)
 }
@@ -116,7 +171,7 @@ func (c client) PostForm(url string, form map[string][]string, opt ...RequestOpt
 // PostMultipartForm performs a POST request to the specified URL with the specified multipart form values and files.
 func (c client) PostMultipartForm(url string, form *multipart.Form, opt ...RequestOption) ([]byte, error) {
 	req := c.NewRequest()
-	req.Header.SetMethod(fasthttp.MethodPost)
+	req.Header.SetMethod(MethodPost.String())
 
 	if err := req.SetRequestURL(url); err != nil {
 		return nil, err
@@ -155,7 +210,7 @@ func (c client) Put(url string, body []byte, opt ...RequestOption) ([]byte, erro
 
 	req.apply(opt)
 
-	req.Header.SetMethod(fasthttp.MethodPut)
+	req.Header.SetMethod(MethodPut.String())
 	req.SetBodyRaw(body)
 
 	return c.call(req)
@@ -168,7 +223,7 @@ func (c client) PutJSON(url string, body, v any, opt ...RequestOption) error {
 		return err
 	}
 
-	opt = append([]RequestOption{WithHeader(fasthttp.HeaderContentType, "application/json")}, opt...)
+	opt = append([]RequestOption{WithHeader(HeaderContentType, ContentTypeJSON)}, opt...)
 
 	resp, err := c.Put(url, reqBody, opt...)
 	if err != nil {
@@ -191,7 +246,7 @@ func (c client) Patch(url string, body []byte, opt ...RequestOption) ([]byte, er
 
 	req.apply(opt)
 
-	req.Header.SetMethod(fasthttp.MethodPatch)
+	req.Header.SetMethod(MethodPatch.String())
 	req.SetBodyRaw(body)
 
 	return c.call(req)
@@ -204,7 +259,7 @@ func (c client) PatchJSON(url string, body, v any, opt ...RequestOption) error {
 		return err
 	}
 
-	opt = append([]RequestOption{WithHeader(fasthttp.HeaderContentType, "application/json")}, opt...)
+	opt = append([]RequestOption{WithHeader(HeaderContentType, ContentTypeJSON)}, opt...)
 
 	resp, err := c.Patch(url, reqBody, opt...)
 	if err != nil {
@@ -227,7 +282,7 @@ func (c client) Delete(url string, opt ...RequestOption) ([]byte, error) {
 
 	req.apply(opt)
 
-	req.Header.SetMethod(fasthttp.MethodDelete)
+	req.Header.SetMethod(MethodDelete.String())
 
 	return c.call(req)
 }
@@ -241,7 +296,7 @@ func (c client) DeleteJSON(url string, body, v any, opt ...RequestOption) error 
 		}
 
 		if len(buf) > 0 {
-			opt = append([]RequestOption{WithHeader(fasthttp.HeaderContentType, "application/json"), WithBody(buf)}, opt...)
+			opt = append([]RequestOption{WithHeader(HeaderContentType, ContentTypeJSON), WithBody(buf)}, opt...)
 		}
 	}
 

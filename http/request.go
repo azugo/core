@@ -46,6 +46,11 @@ func (c client) ReleaseRequest(req *Request) {
 	c.RequestPool.Put(req)
 }
 
+// Method returns the HTTP request method.
+func (r *Request) Method() Method {
+	return Method(r.Header.Method())
+}
+
 // SetRequestURL sets the request URL.
 func (r *Request) SetRequestURL(u string) error {
 	if baseURL := r.client.BaseURL(); baseURL != "" && !strings.Contains(u, "://") {

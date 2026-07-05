@@ -20,7 +20,7 @@ import (
 var (
 	defaultUserAgent string
 
-	strContentTypeJSON = []byte("application/json")
+	strContentTypeJSON = []byte(ContentTypeJSON)
 )
 
 // Instrumentation operation names for HTTP client events.
@@ -63,7 +63,13 @@ type Client interface {
 	Get(url string, opt ...RequestOption) ([]byte, error)
 	// GetJSON sends an HTTP GET request and unmarshals the response body into v.
 	GetJSON(url string, v any, opt ...RequestOption) error
-	// Head sends an HTTP POST request and returns an HTTP response body.
+	// Query sends an HTTP QUERY request and returns an HTTP response body.
+	Query(url string, body []byte, opt ...RequestOption) ([]byte, error)
+	// QueryJSON sends an HTTP QUERY request and unmarshals response body into v.
+	QueryJSON(url string, body, v any, opt ...RequestOption) error
+	// QueryForm sends an HTTP QUERY request with form data and returns an HTTP response body.
+	QueryForm(url string, form map[string][]string, opt ...RequestOption) ([]byte, error)
+	// Post sends an HTTP POST request and returns an HTTP response body.
 	Post(url string, body []byte, opt ...RequestOption) ([]byte, error)
 	// PostJSON sends an HTTP POST request and unmarshals response body into v.
 	PostJSON(url string, body, v any, opt ...RequestOption) error
@@ -112,7 +118,9 @@ type client struct {
 // It retries only idempotent requests or non-idempotent requests if server closes connection.
 // Does not resets timeout.
 func defaultRetryIfErr(req *fasthttp.Request, _ int, err error) (bool, bool) {
-	isIdempotent := req.Header.IsGet() || req.Header.IsHead() || req.Header.IsPut()
+	method := Method(req.Header.Method())
+
+	isIdempotent := method.IsGet() || method.IsHead() || method.IsPut() || method.IsQuery()
 	if !isIdempotent && !errors.Is(err, io.EOF) {
 		return false, false
 	}
