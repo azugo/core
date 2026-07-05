@@ -128,6 +128,11 @@ const (
 const (
 	HeaderAcceptQuery             = "Accept-Query" // RFC 10008, Section 3
 	HeaderContentTransferEncoding = "Content-Transfer-Encoding"
+	HeaderRateLimitLimit          = "RateLimit-Limit"     // draft-ietf-httpapi-ratelimit-headers
+	HeaderRateLimitPolicy         = "RateLimit-Policy"    // draft-ietf-httpapi-ratelimit-headers
+	HeaderRateLimitRemaining      = "RateLimit-Remaining" // draft-ietf-httpapi-ratelimit-headers
+	HeaderRateLimitReset          = "RateLimit-Reset"     // draft-ietf-httpapi-ratelimit-headers
+	HeaderRealIP                  = "X-Real-IP"
 	HeaderTotalCount              = "X-Total-Count"
 )
 

@@ -556,7 +556,7 @@ func TestDeleteJSONRequest(t *testing.T) {
 func TestWithAuthorizationHeader(t *testing.T) {
 	s := newTestHttpServer()
 	s.Handler = func(ctx *fasthttp.RequestCtx) {
-		if auth := ctx.Request.Header.Peek("Authorization"); auth == nil || string(auth) != "Bearer 123456" {
+		if auth := ctx.Request.Header.Peek(HeaderAuthorization); auth == nil || string(auth) != "Bearer 123456" {
 			ctx.SetStatusCode(StatusUnauthorized)
 			return
 		}
@@ -567,7 +567,7 @@ func TestWithAuthorizationHeader(t *testing.T) {
 	defer s.Stop()
 
 	c := NewClient(s.DialContext())
-	body, err := c.Get("http://localhost:8080", WithHeader("Authorization", "Bearer 123456"))
+	body, err := c.Get("http://localhost:8080", WithHeader(HeaderAuthorization, "Bearer 123456"))
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(string(body), "Hello World"))
 }
