@@ -3,7 +3,7 @@ module azugo.io/core
 go 1.25.0
 
 require (
-	github.com/dgraph-io/ristretto/v2 v2.4.0
+	github.com/dgraph-io/ristretto/v2 v2.4.2
 	github.com/go-playground/validator/v10 v10.30.3
 	github.com/go-quicktest/qt v1.102.0
 	github.com/goccy/go-json v0.10.6
