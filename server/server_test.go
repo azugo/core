@@ -102,3 +102,37 @@ func TestAppLogStart(t *testing.T) {
 	qt.Check(t, qt.Equals(logs.All()[0].Message, "Starting Test 1.0.0..."))
 	qt.Check(t, qt.Equals(logs.All()[1].Message, "Stopping Test 1.0.0..."))
 }
+
+// TestAppLogStartWithBlockingStart guards against a regression where "Starting..." was
+// logged only after Start returned. That's wrong for a Runnable (e.g. azugo.App) whose Start
+// blocks for the application's entire lifetime and only returns once Stop unblocks it -
+// "Starting..." would then log after (or interleaved with) "Stopping...".
+func TestAppLogStartWithBlockingStart(t *testing.T) {
+	a, err := New(nil, Options{
+		AppName: "Test",
+		AppVer:  "1.0.0",
+	})
+	qt.Assert(t, qt.IsNil(err))
+	logs := test.ObservedLogs(a)
+	app := &App{App: a}
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
+	wg := sync.WaitGroup{}
+	wg.Go(func() {
+		RunContext(ctx, app)
+	})
+	time.Sleep(100 * time.Millisecond)
+
+	proc, err := os.FindProcess(os.Getpid())
+	qt.Assert(t, qt.IsNil(err))
+	proc.Signal(os.Interrupt)
+
+	wg.Wait()
+	app.wg.Wait()
+
+	qt.Assert(t, qt.HasLen(logs.All(), 2))
+	qt.Check(t, qt.Equals(logs.All()[0].Message, "Starting Test 1.0.0..."))
+	qt.Check(t, qt.Equals(logs.All()[1].Message, "Stopping Test 1.0.0..."))
+}

@@ -27,14 +27,14 @@ type Runnable interface {
 // RunContext starts an application and waits for the context to be cancelled
 // before stopping it gracefully.
 func RunContext(ctx context.Context, a Runnable) {
+	a.Log().Info(fmt.Sprintf("Starting %s...", a.String()))
+
 	go func() {
 		if err := a.Start(); err != nil {
 			a.Log().With(zap.Error(err)).Fatal("Failed to start service")
 
 			os.Exit(1)
 		}
-
-		a.Log().Info(fmt.Sprintf("Starting %s...", a.String()))
 	}()
 
 	<-ctx.Done()
