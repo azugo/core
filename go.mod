@@ -7,7 +7,7 @@ require (
 	github.com/go-playground/validator/v10 v10.30.3
 	github.com/go-quicktest/qt v1.102.0
 	github.com/goccy/go-json v0.10.6
-	github.com/lafriks/pkcs8 v1.2.3
+	github.com/lafriks/pkcs8 v1.2.4
 	github.com/mattn/go-colorable v0.1.15
 	github.com/redis/go-redis/v9 v9.21.0
 	github.com/spf13/cobra v1.10.2
