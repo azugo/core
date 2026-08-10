@@ -1,0 +1,32 @@
+when:
+  branch:
+    - main
+  event:
+    - push
+    - pull_request
+
+matrix:
+  CACHE_IMAGE:
+    - redis:6.0-alpine
+    - redis:7-alpine
+    - redis:8-alpine
+    - valkey/valkey:7.2-alpine
+    - valkey/valkey:8-alpine
+
+services:
+  - name: cache
+    image: ${CACHE_IMAGE}
+    pull: true
+    ports:
+      - 6379
+
+steps:
+  - name: test
+    image: golang:1.26-alpine
+    pull: true
+    environment:
+      CGO_ENABLED: 0
+      REDIS_CONNSTR: redis://cache:6379/0
+    commands:
+      - timeout 30 sh -c 'until nc -z cache 6379; do sleep 1; done'
+      - go test -v ./cache/... ./ratelimit/...
