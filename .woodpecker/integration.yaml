@@ -7,7 +7,7 @@ when:
 
 matrix:
   CACHE_IMAGE:
-    - redis:6.0-alpine
+    - redis:6.2-alpine
     - redis:7-alpine
     - redis:8-alpine
     - valkey/valkey:7.2-alpine

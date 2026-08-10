@@ -6,7 +6,7 @@ Azugo framework core.
 
 * Structured logger [go.uber.org/zap](https://github.com/uber-go/zap)
 * Extendable configuration [viper](https://github.com/spf13/viper) and command line [cobra](https://github.com/spf13/cobra) support
-* Caching using memory or Redis
+* Caching using memory or Redis (Redis 6.2 or later, or any Valkey version)
 * Logger based on [zap](go.uber.org/zap) with output compatible with ECS
 
 ## Special Environment variables used by the Azugo framework
@@ -25,6 +25,8 @@ Azugo framework core.
 * `LOG_OUTPUT_SECONDARY` - Secondary log output location (See `LOG_OUTPUT`)
 
 ### Cache
+
+Redis-backed cache types require Redis 6.2 or later, or any Valkey version.
 
 * `CACHE_TYPE` - Cache type to use in service (defaults to `memory`, allowed values are `memory`, `redis`, `redis-cluster`, `redis-sentinel`).
 * `CACHE_TTL` - Duration on how long to keep items in cache. Defaults to 0 meaning to never expire.
