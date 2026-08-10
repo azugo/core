@@ -57,6 +57,8 @@ func TestCacheInstrumentation(t *testing.T) {
 		cache.InstrumentationSet + ":end",
 
 		cache.InstrumentationGet,
+		cache.InstrumentationGetHit,
+		cache.InstrumentationGetHit + ":end",
 		cache.InstrumentationGet + ":end",
 
 		cache.InstrumentationDelete,

@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"azugo.io/core/instrumenter"
-
-	"go.uber.org/zap"
 )
 
 type cacheOptions struct {
@@ -22,7 +20,9 @@ type cacheOptions struct {
 	Loader             func(ctx context.Context, key string) (any, error)
 	Instrumenter       instrumenter.Instrumenter
 	Serialize          bool
-	Logger             *zap.Logger
+	ClientCache        bool
+	ClientCacheTTL     time.Duration
+	ClientCacheSize    int
 }
 
 // Option for the cache instance.
@@ -32,7 +32,8 @@ type Option interface {
 
 func newCacheOptions(opts ...Option) *cacheOptions {
 	opt := &cacheOptions{
-		Serialize: true,
+		Serialize:   true,
+		ClientCache: true,
 	}
 	for _, o := range opts {
 		o.applyCache(opt)
@@ -130,13 +131,27 @@ func (i Instrumenter) applyCache(c *cacheOptions) {
 	c.Instrumenter = instrumenter.Instrumenter(i)
 }
 
-// Logger sets the logger for the cache backends. When provided, internal
-// backend log messages are forwarded to it; the zap logger's own level
-// configuration controls what is actually emitted.
-type Logger struct{ *zap.Logger }
+// ClientCache enables or disables server-assisted client-side caching support.
+type ClientCache bool
 
-func (l Logger) applyCache(c *cacheOptions) {
-	c.Logger = l.Logger
+func (v ClientCache) applyCache(c *cacheOptions) {
+	c.ClientCache = bool(v)
+}
+
+// ClientCacheTTL sets the local cache TTL for values read through Redis-backed
+// cache instances.
+type ClientCacheTTL time.Duration
+
+func (v ClientCacheTTL) applyCache(c *cacheOptions) {
+	c.ClientCacheTTL = time.Duration(v)
+}
+
+// ClientCacheSize sets the client-side cache memory in bytes per Redis
+// connection.
+type ClientCacheSize int
+
+func (v ClientCacheSize) applyCache(c *cacheOptions) {
+	c.ClientCacheSize = int(v)
 }
 
 // Serialize controls whether values are JSON-serialized before storage in the

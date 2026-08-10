@@ -21,6 +21,9 @@ type Cache struct {
 	ConnectionString string        `mapstructure:"connection" validate:"omitempty"`
 	Password         string        `mapstructure:"password" validate:"omitempty"`
 	KeyPrefix        string        `mapstructure:"key_prefix" validate:"omitempty"`
+	ClientCache      bool          `mapstructure:"client_cache"`
+	ClientCacheTTL   time.Duration `mapstructure:"client_cache_ttl" validate:"omitempty,min=0"`
+	ClientCacheSize  int           `mapstructure:"client_cache_size" validate:"omitempty,min=0"`
 }
 
 // Validate cache configuration section.
@@ -42,10 +45,15 @@ func (c *Cache) Bind(prefix string, v *viper.Viper) {
 
 	v.SetDefault(prefix+".type", "memory")
 	v.SetDefault(prefix+".password", psw)
+	v.SetDefault(prefix+".client_cache", true)
+	v.SetDefault(prefix+".client_cache_size", 16<<20)
 
 	_ = v.BindEnv(prefix+".type", "CACHE_TYPE")
 	_ = v.BindEnv(prefix+".ttl", "CACHE_TTL")
 	_ = v.BindEnv(prefix+".password", "CACHE_PASSWORD")
 	_ = v.BindEnv(prefix+".connection", "CACHE_CONNECTION")
 	_ = v.BindEnv(prefix+".key_prefix", "CACHE_KEY_PREFIX")
+	_ = v.BindEnv(prefix+".client_cache", "CACHE_CLIENT_CACHE")
+	_ = v.BindEnv(prefix+".client_cache_ttl", "CACHE_CLIENT_CACHE_TTL")
+	_ = v.BindEnv(prefix+".client_cache_size", "CACHE_CLIENT_CACHE_SIZE")
 }

@@ -19,17 +19,25 @@ import (
 type memoryCache[T any] struct {
 	cache           *ristretto.Cache[string, T]
 	serializedCache *ristretto.Cache[string, []byte]
-	ttl             time.Duration
-	serialize       bool
-	lock            sync.Mutex
-	loader          func(ctx context.Context, key string) (any, error)
-	instrumenter    instrumenter.Instrumenter
+	// prefix is used only for instrumentation; stored keys are not prefixed.
+	prefix       string
+	ttl          time.Duration
+	serialize    bool
+	lock         sync.Mutex
+	loader       func(ctx context.Context, key string) (any, error)
+	instrumenter instrumenter.Instrumenter
 }
 
-func newMemoryCache[T any](opts ...Option) (Instance[T], error) {
+func newMemoryCache[T any](prefix string, opts ...Option) (Instance[T], error) {
 	opt := newCacheOptions(opts...)
 
+	keyPrefix := opt.KeyPrefix
+	if keyPrefix != "" {
+		keyPrefix += ":"
+	}
+
 	mc := &memoryCache[T]{
+		prefix:       keyPrefix + prefix + ":",
 		ttl:          opt.TTL,
 		serialize:    opt.Serialize,
 		instrumenter: opt.Instrumenter,
@@ -73,6 +81,10 @@ func newMemoryCache[T any](opts ...Option) (Instance[T], error) {
 	return mc, nil
 }
 
+func (c *memoryCache[T]) observe(ctx context.Context, op, key string) func(error) {
+	return c.instrumenter.Observe(ctx, op, c.prefix+key, string(MemoryCache))
+}
+
 func (c *memoryCache[T]) unmarshal(b []byte) (T, error) {
 	val := new(T)
 	if err := json.Unmarshal(b, val); err != nil {
@@ -103,7 +115,7 @@ func (c *memoryCache[T]) loadAndCache(ctx context.Context, key string) (T, error
 }
 
 func (c *memoryCache[T]) Get(ctx context.Context, key string, _ ...ItemOption[T]) (T, error) {
-	finish := instrumenter.ObserveKey(ctx, c.instrumenter, InstrumentationGet, key)
+	finish := c.observe(ctx, InstrumentationGet, key)
 
 	var val T
 
@@ -115,6 +127,8 @@ func (c *memoryCache[T]) Get(ctx context.Context, key string, _ ...ItemOption[T]
 		}
 
 		if b, found := c.serializedCache.Get(key); found {
+			c.observe(ctx, InstrumentationGetHit, key)(nil)
+
 			v, err := c.unmarshal(b)
 			finish(err)
 
@@ -128,6 +142,7 @@ func (c *memoryCache[T]) Get(ctx context.Context, key string, _ ...ItemOption[T]
 		}
 
 		if v, found := c.cache.Get(key); found {
+			c.observe(ctx, InstrumentationGetHit, key)(nil)
 			finish(nil)
 
 			return v, nil
@@ -195,7 +210,7 @@ func (c *memoryCache[T]) Pop(ctx context.Context, key string) (T, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	finish := instrumenter.ObserveKey(ctx, c.instrumenter, InstrumentationGet, key)
+	finish := c.observe(ctx, InstrumentationGet, key)
 
 	if c.serialize {
 		if c.serializedCache == nil {
@@ -240,7 +255,7 @@ func (c *memoryCache[T]) Pop(ctx context.Context, key string) (T, error) {
 }
 
 func (c *memoryCache[T]) Set(ctx context.Context, key string, value T, opts ...ItemOption[T]) error {
-	finish := instrumenter.ObserveKey(ctx, c.instrumenter, InstrumentationSet, key)
+	finish := c.observe(ctx, InstrumentationSet, key)
 
 	opt := newItemOptions(opts...)
 
@@ -257,7 +272,7 @@ func (c *memoryCache[T]) Set(ctx context.Context, key string, value T, opts ...I
 }
 
 func (c *memoryCache[T]) Delete(ctx context.Context, key string) error {
-	finish := instrumenter.ObserveKey(ctx, c.instrumenter, InstrumentationDelete, key)
+	finish := c.observe(ctx, InstrumentationDelete, key)
 	defer finish(nil)
 
 	if c.serialize {

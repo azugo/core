@@ -10,24 +10,24 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/valkey-io/valkey-go"
 )
 
 // All scripts execute atomically on the Redis server and use the server
 // clock (TIME) so that limits are enforced consistently across service
-// instances regardless of their local clock skew. Requires Redis 5.0+
-// (effect based script replication).
+// instances regardless of their local clock skew. Requires Redis 6.2+
+// or Valkey (matching the cache backend minimum supported server).
 var (
 	// KEYS[1] - counter key
 	// ARGV[1] - limit, ARGV[2] - window ms, ARGV[3] - n, ARGV[4] - peek
 	// Returns {allowed, remaining, retry_after_ms, reset_ms}.
 	//nolint:dupword
-	fixedWindowScript = redis.NewScript(`
+	fixedWindowScript = valkey.NewLuaScript(`
 local key = KEYS[1]
 local limit = tonumber(ARGV[1])
 local window = tonumber(ARGV[2])
 local n = tonumber(ARGV[3])
-local peek = tonumber(ARGV[4]) == 1
+local peek = ARGV[4] == "true"
 
 local current = redis.call("GET", key)
 local parsed = tonumber(current)
@@ -85,13 +85,13 @@ return {1, remaining, 0, redis.call("PTTL", key)}
 	// ARGV[3] - n, ARGV[4] - burst, ARGV[5] - peek
 	// Returns {allowed, remaining, retry_after_ms, reset_ms} with durations
 	// rounded up to whole milliseconds.
-	tokenBucketScript = redis.NewScript(`
+	tokenBucketScript = valkey.NewLuaScript(`
 local key = KEYS[1]
 local emission = tonumber(ARGV[1])
 local tau = tonumber(ARGV[2])
 local n = tonumber(ARGV[3])
 local burst = tonumber(ARGV[4])
-local peek = tonumber(ARGV[5]) == 1
+local peek = ARGV[5] == "true"
 
 local t = redis.call("TIME")
 local now = t[1] * 1000 + t[2] / 1000
@@ -144,7 +144,7 @@ return {1, remaining, 0, math.ceil(new_tat - now)}
 	// KEYS[1] - lease set key
 	// ARGV[1] - slots, ARGV[2] - lease TTL ms, ARGV[3] - lease token
 	// Returns {acquired, retry_after_ms}.
-	semaphoreAcquireScript = redis.NewScript(`
+	semaphoreAcquireScript = valkey.NewLuaScript(`
 local key = KEYS[1]
 local slots = tonumber(ARGV[1])
 local lease = tonumber(ARGV[2])
@@ -169,7 +169,7 @@ return {0, math.ceil(tonumber(first[2]) - now)}
 )
 
 type redisLimiter struct {
-	con    redis.Cmdable
+	con    valkey.Client
 	prefix string
 	opt    *options
 	// Token bucket script arguments are constant per limiter and formatted
@@ -178,7 +178,7 @@ type redisLimiter struct {
 	tauArg      string
 }
 
-func newRedisLimiter(con redis.Cmdable, prefix string, opt *options) *redisLimiter {
+func newRedisLimiter(con valkey.Client, prefix string, opt *options) *redisLimiter {
 	r := &redisLimiter{con: con, prefix: prefix, opt: opt}
 
 	if opt.strategy == strategyTokenBucket {
@@ -203,8 +203,12 @@ func (r *redisLimiter) fixedWindow(ctx context.Context, key string, n int, peek 
 		limit = r.opt.limit
 	}
 
-	vals, err := fixedWindowScript.Run(ctx, r.con, []string{r.prefix + key},
-		limit, r.opt.window.Milliseconds(), n, peek).Slice()
+	vals, err := fixedWindowScript.Exec(ctx, r.con, []string{r.prefix + key}, []string{
+		strconv.Itoa(limit),
+		strconv.FormatInt(r.opt.window.Milliseconds(), 10),
+		strconv.Itoa(n),
+		strconv.FormatBool(peek),
+	}).ToArray()
 	if err != nil {
 		return Result{}, err
 	}
@@ -221,8 +225,13 @@ func (r *redisLimiter) tokenBucket(ctx context.Context, key string, n int, peek 
 		tauArg = strconv.FormatFloat((1000/r.opt.rate)*float64(burst), 'f', -1, 64)
 	}
 
-	vals, err := tokenBucketScript.Run(ctx, r.con, []string{r.prefix + key},
-		r.emissionArg, tauArg, n, burst, peek).Slice()
+	vals, err := tokenBucketScript.Exec(ctx, r.con, []string{r.prefix + key}, []string{
+		r.emissionArg,
+		tauArg,
+		strconv.Itoa(n),
+		strconv.Itoa(burst),
+		strconv.FormatBool(peek),
+	}).ToArray()
 	if err != nil {
 		return Result{}, err
 	}
@@ -231,22 +240,25 @@ func (r *redisLimiter) tokenBucket(ctx context.Context, key string, n int, peek 
 }
 
 func (r *redisLimiter) reset(ctx context.Context, key string) error {
-	return r.con.Del(ctx, r.prefix+key).Err()
+	return r.con.Do(ctx, r.con.B().Del().Key(r.prefix+key).Build()).Error()
 }
 
 type redisSemaphore struct {
-	con    redis.Cmdable
+	con    valkey.Client
 	prefix string
 	opt    *options
 }
 
-func newRedisSemaphore(con redis.Cmdable, prefix string, opt *options) *redisSemaphore {
+func newRedisSemaphore(con valkey.Client, prefix string, opt *options) *redisSemaphore {
 	return &redisSemaphore{con: con, prefix: prefix, opt: opt}
 }
 
 func (r *redisSemaphore) acquire(ctx context.Context, key, token string) (bool, time.Duration, error) {
-	vals, err := semaphoreAcquireScript.Run(ctx, r.con, []string{r.prefix + key},
-		r.opt.slots, r.opt.leaseTTL.Milliseconds(), token).Slice()
+	vals, err := semaphoreAcquireScript.Exec(ctx, r.con, []string{r.prefix + key}, []string{
+		strconv.Itoa(r.opt.slots),
+		strconv.FormatInt(r.opt.leaseTTL.Milliseconds(), 10),
+		token,
+	}).ToArray()
 	if err != nil {
 		return false, 0, err
 	}
@@ -255,31 +267,34 @@ func (r *redisSemaphore) acquire(ctx context.Context, key, token string) (bool, 
 		return false, 0, fmt.Errorf("unexpected semaphore script reply: %v", vals)
 	}
 
-	acquired, ok := vals[0].(int64)
-	retryAfter, ok2 := vals[1].(int64)
+	acquired, err := vals[0].AsInt64()
+	if err != nil {
+		return false, 0, fmt.Errorf("unexpected semaphore script reply: %w", err)
+	}
 
-	if !ok || !ok2 {
-		return false, 0, fmt.Errorf("unexpected semaphore script reply: %v", vals)
+	retryAfter, err := vals[1].AsInt64()
+	if err != nil {
+		return false, 0, fmt.Errorf("unexpected semaphore script reply: %w", err)
 	}
 
 	return acquired == 1, time.Duration(retryAfter) * time.Millisecond, nil
 }
 
 func (r *redisSemaphore) release(ctx context.Context, key, token string) error {
-	return r.con.ZRem(ctx, r.prefix+key, token).Err()
+	return r.con.Do(ctx, r.con.B().Zrem().Key(r.prefix+key).Member(token).Build()).Error()
 }
 
-func parseLimiterReply(vals []any) (Result, error) {
+func parseLimiterReply(vals []valkey.ValkeyMessage) (Result, error) {
 	if len(vals) != 4 {
 		return Result{}, fmt.Errorf("unexpected rate limit script reply: %v", vals)
 	}
 
 	var nums [4]int64
 
-	for i, v := range vals {
-		n, ok := v.(int64)
-		if !ok {
-			return Result{}, fmt.Errorf("unexpected rate limit script reply: %v", vals)
+	for i := range vals {
+		n, err := vals[i].AsInt64()
+		if err != nil {
+			return Result{}, fmt.Errorf("unexpected rate limit script reply: %w", err)
 		}
 
 		nums[i] = n
