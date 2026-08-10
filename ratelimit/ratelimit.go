@@ -17,7 +17,7 @@ import (
 	"azugo.io/core/cache"
 	"azugo.io/core/instrumenter"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/valkey-io/valkey-go"
 )
 
 // Instrumentation operation names for rate limiter events.
@@ -156,7 +156,7 @@ func NewTokenBucket(c *cache.Cache, name string, rate float64, burst int, opts .
 	return newLimiter(c, name, opt)
 }
 
-func connection(c *cache.Cache) (redis.Cmdable, bool, error) {
+func connection(c *cache.Cache) (valkey.Client, bool, error) {
 	if c.ConfiguredType() == cache.MemoryCache {
 		return nil, false, nil
 	}

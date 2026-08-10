@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/valkey-io/valkey-go"
 )
 
 // Instrumentation operation names for cache events.
@@ -19,6 +19,7 @@ const (
 	InstrumentationClose  = "cache-close"
 	InstrumentationPing   = "cache-ping"
 	InstrumentationGet    = "cache-get"
+	InstrumentationGetHit = "cache-get-hit"
 	InstrumentationLoader = "cache-loader"
 	InstrumentationSet    = "cache-set"
 	InstrumentationDelete = "cache-delete"
@@ -40,7 +41,7 @@ func (e KeyNotFoundError) Error() string {
 type Cache struct {
 	options     []Option
 	cache       map[string]any
-	redisCon    redis.Cmdable
+	redisCon    valkey.Client
 	redisConStr string
 }
 
@@ -88,18 +89,16 @@ func (c *Cache) Start(ctx context.Context) error {
 	}
 
 	var (
-		con redis.Cmdable
+		con valkey.Client
 		err error
 	)
 
 	//nolint:exhaustive // check is already done above
 	switch opt.Type {
-	case RedisCache:
-		con, err = newRedisClient(opt.ConnectionString, opt.ConnectionPassword)
-	case RedisClusterCache:
-		con, err = newRedisClusterClient(opt.ConnectionString, opt.ConnectionPassword)
+	case RedisCache, RedisClusterCache:
+		con, err = newRedisClient(opt)
 	case RedisSentinelCache:
-		con, err = newRedisSentinelClient(opt.ConnectionString, opt.ConnectionPassword)
+		con, err = newRedisSentinelClient(opt)
 	}
 
 	if err != nil {
@@ -111,9 +110,7 @@ func (c *Cache) Start(ctx context.Context) error {
 	c.redisCon = con
 	c.redisConStr = opt.ConnectionString
 
-	if opt.Logger != nil {
-		setRedisLogger(opt.Logger)
-	}
+	finish(nil)
 
 	return nil
 }
@@ -126,15 +123,9 @@ func (c *Cache) Close() {
 	defer finish(nil)
 
 	switch opt.Type {
-	case RedisCache, RedisSentinelCache:
-		if v, ok := c.redisCon.(*redis.Client); ok {
-			_ = v.Close()
-		}
-
-		c.redisCon = nil
-	case RedisClusterCache:
-		if v, ok := c.redisCon.(*redis.ClusterClient); ok {
-			_ = v.Close()
+	case RedisCache, RedisClusterCache, RedisSentinelCache:
+		if c.redisCon != nil {
+			c.redisCon.Close()
 		}
 
 		c.redisCon = nil
@@ -151,8 +142,8 @@ func (c *Cache) Close() {
 	c.cache = nil
 }
 
-// Connection returns the underlying Redis connection shared by the cache.
-func (c *Cache) Connection() redis.Cmdable {
+// Connection returns the underlying Redis client shared by the cache.
+func (c *Cache) Connection() valkey.Client {
 	return c.redisCon
 }
 
@@ -177,11 +168,11 @@ func (c *Cache) Ping(ctx context.Context) error {
 
 	finish := opt.Instrumenter.Observe(ctx, InstrumentationPing)
 
-	if (opt.Type == RedisCache || opt.Type == RedisClusterCache) && c.redisCon != nil {
-		if s := c.redisCon.Ping(ctx); s != nil && s.Err() != nil {
-			finish(s.Err())
+	if opt.Type != MemoryCache && c.redisCon != nil {
+		if err := c.redisCon.Do(ctx, c.redisCon.B().Ping().Build()).Error(); err != nil {
+			finish(err)
 
-			return s.Err()
+			return err
 		}
 	}
 
@@ -228,24 +219,14 @@ func Create[T any](cache *Cache, name string, opts ...Option) (Instance[T], erro
 
 	switch o.Type {
 	case MemoryCache:
-		c, err = newMemoryCache[T](opt...)
+		c, err = newMemoryCache[T](name, opt...)
 		if err != nil {
 			return nil, err
 		}
-	case RedisCache:
+	case RedisCache, RedisClusterCache:
 		con := cache.redisCon
 		if o.ConnectionString != cache.redisConStr {
-			con, err = newRedisClient(o.ConnectionString, o.ConnectionPassword)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		c = newRedisCache[T](name, con, opt...)
-	case RedisClusterCache:
-		con := cache.redisCon
-		if o.ConnectionString != cache.redisConStr {
-			con, err = newRedisClusterClient(o.ConnectionString, o.ConnectionPassword)
+			con, err = newRedisClient(o)
 			if err != nil {
 				return nil, err
 			}
@@ -255,7 +236,7 @@ func Create[T any](cache *Cache, name string, opts ...Option) (Instance[T], erro
 	case RedisSentinelCache:
 		con := cache.redisCon
 		if o.ConnectionString != cache.redisConStr {
-			con, err = newRedisSentinelClient(o.ConnectionString, o.ConnectionPassword)
+			con, err = newRedisSentinelClient(o)
 			if err != nil {
 				return nil, err
 			}
@@ -287,12 +268,10 @@ func ValidateConnectionString(typ Type, connStr string) error {
 
 	//nolint:exhaustive // memory cache type require no validation
 	switch typ {
-	case RedisCache:
-		_, err = ParseRedisURL(connStr)
-	case RedisClusterCache:
-		_, err = ParseRedisClusterURL(connStr)
+	case RedisCache, RedisClusterCache:
+		_, err = valkey.ParseURL(connStr)
 	case RedisSentinelCache:
-		_, err = ParseRedisSentinelURL(connStr)
+		_, err = parseRedisSentinelURL(connStr)
 	default:
 		return fmt.Errorf("unsupported cache type: %v", typ)
 	}

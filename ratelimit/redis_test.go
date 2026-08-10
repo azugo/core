@@ -218,7 +218,8 @@ func TestRedisFixedWindowPreservesCounterWithoutTTL(t *testing.T) {
 
 	ctx := context.TODO()
 
-	err = c.Connection().Set(ctx, limiterRedisKey(c, name, "key"), "3", 0).Err()
+	con := c.Connection()
+	err = con.Do(ctx, con.B().Set().Key(limiterRedisKey(c, name, "key")).Value("3").Build()).Error()
 	qt.Assert(t, qt.IsNil(err))
 
 	res, err := l.Allow(ctx, "key")
@@ -236,7 +237,8 @@ func TestRedisScriptsHandleNonNumericState(t *testing.T) {
 	fw, err := NewFixedWindow(c, fwName, 3, time.Minute)
 	qt.Assert(t, qt.IsNil(err))
 
-	err = c.Connection().Set(ctx, limiterRedisKey(c, fwName, "key"), "bad", 0).Err()
+	con := c.Connection()
+	err = con.Do(ctx, con.B().Set().Key(limiterRedisKey(c, fwName, "key")).Value("bad").Build()).Error()
 	qt.Assert(t, qt.IsNil(err))
 
 	res, err := fw.Allow(ctx, "key")
@@ -248,7 +250,7 @@ func TestRedisScriptsHandleNonNumericState(t *testing.T) {
 	tb, err := NewTokenBucket(c, tbName, 10, 2)
 	qt.Assert(t, qt.IsNil(err))
 
-	err = c.Connection().Set(ctx, limiterRedisKey(c, tbName, "key"), "bad", 0).Err()
+	err = con.Do(ctx, con.B().Set().Key(limiterRedisKey(c, tbName, "key")).Value("bad").Build()).Error()
 	qt.Assert(t, qt.IsNil(err))
 
 	res, err = tb.Allow(ctx, "key")

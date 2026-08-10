@@ -34,6 +34,9 @@ Redis-backed cache types require Redis 6.2 or later, or any Valkey version.
 * `CACHE_CONNECTION` - If other than memory cache is used specifies connection string on how to connect to cache storage.
 * `CACHE_PASSWORD` - Password to use in connection string.
 * `CACHE_PASSWORD_FILE` - File to read value for `CACHE_PASSWORD` from.
+* `CACHE_CLIENT_CACHE` - Enable server-assisted client-side caching support on Redis connections (defaults to `true`). Set to `false` for providers without `CLIENT TRACKING` support (e.g. Google Cloud Memorystore).
+* `CACHE_CLIENT_CACHE_TTL` - Default duration to keep values in the in-process client-side cache for all cache instances (defaults to `0` meaning disabled). Individual cache instances can override it with the `cache.ClientCacheTTL` option.
+* `CACHE_CLIENT_CACHE_SIZE` - Client-side cache memory in bytes per Redis connection (defaults to `16777216` - 16 MiB).
 
 #### Redis Sentinel Connection String Format
 
@@ -49,6 +52,9 @@ Where:
 * `host1:port,host2:port,host3:port` - Comma-separated list of Redis Sentinel addresses
 * `masterName` - The name of the Redis master in the Sentinel configuration
 * `db=0` - Optional database number (defaults to 0)
+
+Use the `sentinels://` scheme to connect to sentinels and the master over TLS. Add
+`skip_verify=true` to skip server certificate verification (only applies with `sentinels://`).
 
 Example:
 

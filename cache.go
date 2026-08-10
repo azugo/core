@@ -17,7 +17,6 @@ func (a *App) initCache() error {
 	opts := []cache.Option{
 		conf.Type,
 		cache.Instrumenter(a.Instrumenter()),
-		cache.Logger{Logger: a.Log().Named("cache")},
 	}
 
 	if conf.TTL > 0 {
@@ -34,6 +33,18 @@ func (a *App) initCache() error {
 
 	if len(conf.KeyPrefix) != 0 {
 		opts = append(opts, cache.KeyPrefix(conf.KeyPrefix))
+	}
+
+	if !conf.ClientCache {
+		opts = append(opts, cache.ClientCache(false))
+	}
+
+	if conf.ClientCache && conf.ClientCacheTTL > 0 {
+		opts = append(opts, cache.ClientCacheTTL(conf.ClientCacheTTL))
+	}
+
+	if conf.ClientCacheSize > 0 {
+		opts = append(opts, cache.ClientCacheSize(conf.ClientCacheSize))
 	}
 
 	a.cache = cache.New(opts...)

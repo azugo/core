@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -18,32 +17,20 @@ import (
 	"azugo.io/core/instrumenter"
 
 	"github.com/goccy/go-json"
-	"github.com/redis/go-redis/v9"
-	"go.uber.org/zap"
+	"github.com/valkey-io/valkey-go"
 )
 
-type redisZapLogger struct {
-	log *zap.SugaredLogger
-}
-
-func (l *redisZapLogger) Printf(_ context.Context, format string, v ...any) {
-	l.log.Debugf(format, v...)
-}
-
-func setRedisLogger(logger *zap.Logger) {
-	redis.SetLogger(&redisZapLogger{log: logger.Sugar()})
-	redis.SetLogLevel(3) // debug
-}
-
 type redisCache[T any] struct {
-	con          redis.Cmdable
-	prefix       string
-	ttl          time.Duration
-	loader       func(ctx context.Context, key string) (any, error)
-	instrumenter instrumenter.Instrumenter
+	con            valkey.Client
+	typ            Type
+	prefix         string
+	ttl            time.Duration
+	clientCacheTTL time.Duration
+	loader         func(ctx context.Context, key string) (any, error)
+	instrumenter   instrumenter.Instrumenter
 }
 
-func newRedisCache[T any](prefix string, con redis.Cmdable, opts ...Option) Instance[T] {
+func newRedisCache[T any](prefix string, con valkey.Client, opts ...Option) Instance[T] {
 	opt := newCacheOptions(opts...)
 
 	keyPrefix := opt.KeyPrefix
@@ -63,133 +50,36 @@ func newRedisCache[T any](prefix string, con redis.Cmdable, opts ...Option) Inst
 	}
 
 	return &redisCache[T]{
-		con:          con,
-		prefix:       keyPrefix + prefix + ":",
-		ttl:          opt.TTL,
-		loader:       loader,
-		instrumenter: opt.Instrumenter,
+		con:            con,
+		typ:            opt.Type,
+		prefix:         keyPrefix + prefix + ":",
+		ttl:            opt.TTL,
+		clientCacheTTL: opt.ClientCacheTTL,
+		loader:         loader,
+		instrumenter:   opt.Instrumenter,
 	}
 }
 
-func parseCustomURLAttr(v string) (string, bool, error) {
-	u, err := url.Parse(v)
-	if err != nil {
-		return "", false, err
-	}
-
-	var insecureSkipVerify bool
-
-	if u.RawQuery != "" {
-		if q := u.Query(); q.Get("skip_verify") == "true" {
-			insecureSkipVerify = true
-
-			q.Del("skip_verify")
-			u.RawQuery = q.Encode()
-		}
-	}
-
-	return u.String(), insecureSkipVerify, nil
+func (c *redisCache[T]) observe(ctx context.Context, op, key string) func(error) {
+	return c.instrumenter.Observe(ctx, op, c.prefix+key, string(c.typ))
 }
 
-// ParseRedisClusterURL parses a Redis Cluster URL string into cluster client options.
-func ParseRedisClusterURL(v string) (*redis.ClusterOptions, error) {
-	v, insecureSkipVerify, err := parseCustomURLAttr(v)
-	if err != nil {
-		return nil, err
-	}
-
-	o, err := redis.ParseClusterURL(v)
-	if err == nil && insecureSkipVerify {
-		if o.TLSConfig == nil {
-			o.TLSConfig = &tls.Config{
-				MinVersion: tls.VersionTLS12,
-			}
-		}
-
-		o.TLSConfig.InsecureSkipVerify = insecureSkipVerify
-	}
-
-	return o, err
-}
-
-// ParseRedisURL parses a Redis URL string into client options.
-func ParseRedisURL(v string) (*redis.Options, error) {
-	v, insecureSkipVerify, err := parseCustomURLAttr(v)
-	if err != nil {
-		return nil, err
-	}
-
-	o, err := redis.ParseURL(v)
-	if err == nil && insecureSkipVerify {
-		if o.TLSConfig == nil {
-			o.TLSConfig = &tls.Config{
-				MinVersion: tls.VersionTLS12,
-			}
-		}
-
-		o.TLSConfig.InsecureSkipVerify = insecureSkipVerify
-	}
-
-	return o, err
-}
-
-func newRedisClient(constr, password string) (redis.Cmdable, error) {
-	redisOptions, err := ParseRedisURL(constr)
-	if err != nil {
-		return nil, err
-	}
-
-	// If password is provided override provided in connection string.
-	if len(password) != 0 {
-		redisOptions.Password = password
-	}
-
-	return redis.NewClient(redisOptions), nil
-}
-
-func newRedisClusterClient(constr, password string) (redis.Cmdable, error) {
-	redisOptions, err := ParseRedisClusterURL(constr)
-	if err != nil {
-		return nil, err
-	}
-
-	// If password is provided override provided in connection string.
-	if len(password) != 0 {
-		redisOptions.Password = password
-	}
-
-	return redis.NewClusterClient(redisOptions), nil
-}
-
-// newRedisSentinelClient creates a new Redis Sentinel client.
-func newRedisSentinelClient(connectionString, password string) (redis.Cmdable, error) {
-	options, err := ParseRedisSentinelURL(connectionString)
-	if err != nil {
-		return nil, err
-	}
-
-	// If password is provided override provided in connection string
-	if len(password) != 0 {
-		options.Password = password
-	}
-
-	return redis.NewFailoverClient(options), nil
-}
-
-// ParseRedisSentinelURL parses Redis Sentinel URL to extract connection information.
-func ParseRedisSentinelURL(urlStr string) (*redis.FailoverOptions, error) {
-	urlStr, insecureSkipVerify, err := parseCustomURLAttr(urlStr)
-	if err != nil {
-		return nil, err
-	}
-
+func parseRedisSentinelURL(urlStr string) (valkey.ClientOption, error) {
 	u, err := url.Parse(urlStr)
 	if err != nil {
-		return nil, err
+		return valkey.ClientOption{}, err
 	}
 
-	if u.Scheme != "sentinel" {
-		return nil, errors.New("redis sentinel URL must start with sentinel:// scheme")
+	var tlsConfig *tls.Config
+
+	switch u.Scheme {
+	case "sentinel":
+	case "sentinels":
+		tlsConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		}
+	default:
+		return valkey.ClientOption{}, errors.New("redis sentinel URL must start with sentinel:// or sentinels:// scheme")
 	}
 
 	// Extract username if present
@@ -200,22 +90,21 @@ func ParseRedisSentinelURL(urlStr string) (*redis.FailoverOptions, error) {
 
 	masterName := strings.TrimPrefix(u.Path, "/")
 	if masterName == "" {
-		return nil, errors.New("master name is required in sentinel URL path")
+		return valkey.ClientOption{}, errors.New("master name is required in sentinel URL path")
 	}
 
 	if u.Host == "" {
-		return nil, errors.New("sentinel addresses are required")
+		return valkey.ClientOption{}, errors.New("sentinel addresses are required")
 	}
 
-	addrs := strings.Split(u.Host, ",")
-	if len(addrs) == 0 {
-		return nil, errors.New("at least one sentinel address is required")
-	}
-
-	options := &redis.FailoverOptions{
-		MasterName:    masterName,
-		SentinelAddrs: addrs,
-		Username:      username,
+	options := valkey.ClientOption{
+		InitAddress: strings.Split(u.Host, ","),
+		Username:    username,
+		TLSConfig:   tlsConfig,
+		Sentinel: valkey.SentinelOption{
+			MasterSet: masterName,
+			TLSConfig: tlsConfig,
+		},
 	}
 
 	// Parse query parameters
@@ -225,24 +114,53 @@ func ParseRedisSentinelURL(urlStr string) (*redis.FailoverOptions, error) {
 		if dbStr := q.Get("db"); dbStr != "" {
 			db, err := strconv.Atoi(dbStr)
 			if err != nil {
-				return nil, fmt.Errorf("invalid db value: %w", err)
+				return valkey.ClientOption{}, fmt.Errorf("invalid db value: %w", err)
 			}
 
-			options.DB = db
+			options.SelectDB = db
 		}
 
-		if insecureSkipVerify {
-			if options.TLSConfig == nil {
-				options.TLSConfig = &tls.Config{
-					MinVersion: tls.VersionTLS12,
-				}
-			}
-
-			options.TLSConfig.InsecureSkipVerify = true
+		if tlsConfig != nil && q.Get("skip_verify") == "true" {
+			tlsConfig.InsecureSkipVerify = true
 		}
 	}
 
 	return options, nil
+}
+
+func newValkeyClient(copt valkey.ClientOption, o *cacheOptions) (valkey.Client, error) {
+	// If password is provided override provided in connection string.
+	if len(o.ConnectionPassword) != 0 {
+		copt.Password = o.ConnectionPassword
+	}
+
+	if !o.ClientCache {
+		copt.DisableCache = true
+	}
+
+	if !copt.DisableCache && o.ClientCacheSize > 0 {
+		copt.CacheSizeEachConn = o.ClientCacheSize
+	}
+
+	return valkey.NewClient(copt)
+}
+
+func newRedisClient(o *cacheOptions) (valkey.Client, error) {
+	copt, err := valkey.ParseURL(o.ConnectionString)
+	if err != nil {
+		return nil, err
+	}
+
+	return newValkeyClient(copt, o)
+}
+
+func newRedisSentinelClient(o *cacheOptions) (valkey.Client, error) {
+	copt, err := parseRedisSentinelURL(o.ConnectionString)
+	if err != nil {
+		return nil, err
+	}
+
+	return newValkeyClient(copt, o)
 }
 
 func (c *redisCache[T]) Get(ctx context.Context, key string, opts ...ItemOption[T]) (T, error) {
@@ -251,10 +169,22 @@ func (c *redisCache[T]) Get(ctx context.Context, key string, opts ...ItemOption[
 		return *val, ErrCacheClosed
 	}
 
-	finish := instrumenter.ObserveKey(ctx, c.instrumenter, InstrumentationGet, c.prefix+key)
-	s := c.con.Get(ctx, c.prefix+key)
+	finish := c.observe(ctx, InstrumentationGet, key)
 
-	if errors.Is(s.Err(), redis.Nil) {
+	var res valkey.ValkeyResult
+	if c.clientCacheTTL > 0 {
+		res = c.con.DoCache(ctx, c.con.B().Get().Key(c.prefix+key).Cache(), c.clientCacheTTL)
+	} else {
+		res = c.con.Do(ctx, c.con.B().Get().Key(c.prefix+key).Build())
+	}
+
+	if res.IsCacheHit() {
+		c.observe(ctx, InstrumentationGetHit, key)(nil)
+	}
+
+	v, err := res.ToString()
+
+	if valkey.IsValkeyNil(err) {
 		if c.loader != nil {
 			v, err := c.loader(ctx, key)
 			if err != nil {
@@ -283,13 +213,13 @@ func (c *redisCache[T]) Get(ctx context.Context, key string, opts ...ItemOption[
 		return *val, nil
 	}
 
-	if s.Err() != nil {
-		finish(s.Err())
+	if err != nil {
+		finish(err)
 
-		return *val, s.Err()
+		return *val, err
 	}
 
-	if err := json.Unmarshal([]byte(s.Val()), val); err != nil {
+	if err := json.Unmarshal([]byte(v), val); err != nil {
 		err = fmt.Errorf("invalid cache value: %w", err)
 		finish(err)
 
@@ -307,25 +237,25 @@ func (c *redisCache[T]) Pop(ctx context.Context, key string) (T, error) {
 		return *val, ErrCacheClosed
 	}
 
-	finishG := instrumenter.ObserveKey(ctx, c.instrumenter, InstrumentationGet, c.prefix+key)
-	finishD := instrumenter.ObserveKey(ctx, c.instrumenter, InstrumentationDelete, c.prefix+key)
+	finishG := c.observe(ctx, InstrumentationGet, key)
+	finishD := c.observe(ctx, InstrumentationDelete, key)
 
-	s := c.con.GetDel(ctx, c.prefix+key)
-	if errors.Is(s.Err(), redis.Nil) {
+	v, err := c.con.Do(ctx, c.con.B().Getdel().Key(c.prefix+key).Build()).ToString()
+	if valkey.IsValkeyNil(err) {
 		finishD(nil)
 		finishG(nil)
 
 		return *val, KeyNotFoundError{Key: key}
 	}
 
-	if s.Err() != nil {
-		finishD(s.Err())
-		finishG(s.Err())
+	if err != nil {
+		finishD(err)
+		finishG(err)
 
-		return *val, s.Err()
+		return *val, err
 	}
 
-	if err := json.Unmarshal([]byte(s.Val()), val); err != nil {
+	if err := json.Unmarshal([]byte(v), val); err != nil {
 		err = fmt.Errorf("invalid cache value: %w", err)
 		finishD(err)
 		finishG(err)
@@ -344,7 +274,7 @@ func (c *redisCache[T]) Set(ctx context.Context, key string, value T, opts ...It
 		return ErrCacheClosed
 	}
 
-	finish := instrumenter.ObserveKey(ctx, c.instrumenter, InstrumentationSet, c.prefix+key)
+	finish := c.observe(ctx, InstrumentationSet, key)
 
 	buf, err := json.Marshal(value)
 	if err != nil {
@@ -361,11 +291,19 @@ func (c *redisCache[T]) Set(ctx context.Context, key string, value T, opts ...It
 		ttl = opt.TTL
 	}
 
-	s := c.con.Set(ctx, c.prefix+key, string(buf), ttl)
-	if s.Err() != nil {
-		finish(s.Err())
+	cmd := c.con.B().Set().Key(c.prefix + key).Value(string(buf))
 
-		return s.Err()
+	var completed valkey.Completed
+	if ttl > 0 {
+		completed = cmd.Px(ttl).Build()
+	} else {
+		completed = cmd.Build()
+	}
+
+	if err := c.con.Do(ctx, completed).Error(); err != nil {
+		finish(err)
+
+		return err
 	}
 
 	finish(nil)
@@ -378,13 +316,12 @@ func (c *redisCache[T]) Delete(ctx context.Context, key string) error {
 		return ErrCacheClosed
 	}
 
-	finish := instrumenter.ObserveKey(ctx, c.instrumenter, InstrumentationSet, c.prefix+key)
+	finish := c.observe(ctx, InstrumentationDelete, key)
 
-	s := c.con.Del(ctx, c.prefix+key)
-	if s.Err() != nil {
-		finish(s.Err())
+	if err := c.con.Do(ctx, c.con.B().Del().Key(c.prefix+key).Build()).Error(); err != nil {
+		finish(err)
 
-		return s.Err()
+		return err
 	}
 
 	finish(nil)
@@ -397,12 +334,7 @@ func (c *redisCache[T]) Ping(ctx context.Context) error {
 		return nil
 	}
 
-	s := c.con.Ping(ctx)
-	if s.Err() != nil {
-		return s.Err()
-	}
-
-	return nil
+	return c.con.Do(ctx, c.con.B().Ping().Build()).Error()
 }
 
 func (c *redisCache[T]) Close() error {
@@ -410,21 +342,8 @@ func (c *redisCache[T]) Close() error {
 		return nil
 	}
 
-	var err error
-
-	switch v := c.con.(type) {
-	case *redis.Client:
-		err = v.Close()
-	case *redis.ClusterClient:
-		err = v.Close()
-	case nil:
-		// do nothing
-	default:
-		// this will not happen anyway, unless we mishandle it on `Init`
-		panic(fmt.Sprintf("invalid redis client: %v", reflect.TypeOf(v)))
-	}
-
+	c.con.Close()
 	c.con = nil
 
-	return err
+	return nil
 }
