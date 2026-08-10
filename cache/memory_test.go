@@ -22,8 +22,6 @@ func TestMemoryCacheGetSet(t *testing.T) {
 	err = i.Set(context.TODO(), "key", "value")
 	qt.Check(t, qt.IsNil(err))
 
-	// Even if a Set gets applied, it might take a few milliseconds after the call has returned to the user.
-	// In database terms, it is an eventual consistency model.
 	time.Sleep(10 * time.Millisecond)
 	val, err := i.Get(context.TODO(), "key")
 	qt.Check(t, qt.IsNil(err))
@@ -41,8 +39,7 @@ func TestMemoryCachePop(t *testing.T) {
 
 	err = i.Set(context.TODO(), "key", "value")
 	qt.Check(t, qt.IsNil(err))
-	// Even if a Set gets applied, it might take a few milliseconds after the call has returned to the user.
-	// In database terms, it is an eventual consistency model.
+
 	time.Sleep(10 * time.Millisecond)
 	val, err := i.Pop(context.TODO(), "key")
 	qt.Check(t, qt.IsNil(err))
@@ -65,6 +62,7 @@ func TestMemoryCacheDelete(t *testing.T) {
 	err = i.Set(context.TODO(), "key", "value")
 	qt.Check(t, qt.IsNil(err))
 
+	time.Sleep(10 * time.Millisecond)
 	err = i.Delete(context.TODO(), "key")
 	qt.Check(t, qt.IsNil(err))
 
