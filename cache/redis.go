@@ -23,6 +23,7 @@ import (
 type redisCache[T any] struct {
 	con            valkey.Client
 	typ            Type
+	name           string
 	prefix         string
 	ttl            time.Duration
 	clientCacheTTL time.Duration
@@ -52,6 +53,7 @@ func newRedisCache[T any](prefix string, con valkey.Client, opts ...Option) Inst
 	return &redisCache[T]{
 		con:            con,
 		typ:            opt.Type,
+		name:           prefix,
 		prefix:         keyPrefix + prefix + ":",
 		ttl:            opt.TTL,
 		clientCacheTTL: opt.ClientCacheTTL,
@@ -61,7 +63,7 @@ func newRedisCache[T any](prefix string, con valkey.Client, opts ...Option) Inst
 }
 
 func (c *redisCache[T]) observe(ctx context.Context, op, key string) func(error) {
-	return c.instrumenter.Observe(ctx, op, c.prefix+key, string(c.typ))
+	return c.instrumenter.Observe(ctx, op, c.prefix+key, string(c.typ), c.name)
 }
 
 func parseRedisSentinelURL(urlStr string) (valkey.ClientOption, error) {

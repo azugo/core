@@ -114,7 +114,10 @@ func TestMemoryCacheGetHit(t *testing.T) {
 		hits := 0
 		instr := func(_ context.Context, op string, args ...any) func(error) {
 			key, ok := InstrGetHit(op, args...)
-			if backend, bok := InstrBackend(args...); ok && bok && key == "test:key" && backend == MemoryCache {
+			backend, bok := InstrBackend(args...)
+			instance, iok := InstrInstance(args...)
+
+			if ok && bok && iok && key == "test:key" && backend == MemoryCache && instance == "test" {
 				hits++
 			}
 

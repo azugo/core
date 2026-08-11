@@ -56,6 +56,18 @@ func InstrBackend(args ...any) (Type, bool) {
 	return Type(t), ok
 }
 
+// InstrInstance returns the cache instance name from instrumentation event
+// arguments if present.
+func InstrInstance(args ...any) (string, bool) {
+	if len(args) < 3 {
+		return "", false
+	}
+
+	name, ok := args[2].(string)
+
+	return name, ok
+}
+
 // InstrLoader returns cache key if the operation is cache loader event.
 func InstrLoader(op string, args ...any) (string, bool) {
 	if op != InstrumentationLoader || len(args) == 0 {

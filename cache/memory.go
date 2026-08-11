@@ -19,13 +19,13 @@ import (
 type memoryCache[T any] struct {
 	cache           *ristretto.Cache[string, T]
 	serializedCache *ristretto.Cache[string, []byte]
-	// prefix is used only for instrumentation; stored keys are not prefixed.
-	prefix       string
-	ttl          time.Duration
-	serialize    bool
-	lock         sync.Mutex
-	loader       func(ctx context.Context, key string) (any, error)
-	instrumenter instrumenter.Instrumenter
+	name            string
+	prefix          string
+	ttl             time.Duration
+	serialize       bool
+	lock            sync.Mutex
+	loader          func(ctx context.Context, key string) (any, error)
+	instrumenter    instrumenter.Instrumenter
 }
 
 func newMemoryCache[T any](prefix string, opts ...Option) (Instance[T], error) {
@@ -37,6 +37,7 @@ func newMemoryCache[T any](prefix string, opts ...Option) (Instance[T], error) {
 	}
 
 	mc := &memoryCache[T]{
+		name:         prefix,
 		prefix:       keyPrefix + prefix + ":",
 		ttl:          opt.TTL,
 		serialize:    opt.Serialize,
@@ -82,7 +83,7 @@ func newMemoryCache[T any](prefix string, opts ...Option) (Instance[T], error) {
 }
 
 func (c *memoryCache[T]) observe(ctx context.Context, op, key string) func(error) {
-	return c.instrumenter.Observe(ctx, op, c.prefix+key, string(MemoryCache))
+	return c.instrumenter.Observe(ctx, op, c.prefix+key, string(MemoryCache), c.name)
 }
 
 func (c *memoryCache[T]) unmarshal(b []byte) (T, error) {
