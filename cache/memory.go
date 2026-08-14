@@ -83,6 +83,10 @@ func newMemoryCache[T any](prefix string, opts ...Option) (Instance[T], error) {
 }
 
 func (c *memoryCache[T]) observe(ctx context.Context, op, key string) func(error) {
+	if c.instrumenter.Empty() {
+		return instrumenter.NullFinish
+	}
+
 	return c.instrumenter.Observe(ctx, op, c.prefix+key, string(MemoryCache), c.name)
 }
 

@@ -63,6 +63,10 @@ func newRedisCache[T any](prefix string, con valkey.Client, opts ...Option) Inst
 }
 
 func (c *redisCache[T]) observe(ctx context.Context, op, key string) func(error) {
+	if c.instrumenter.Empty() {
+		return instrumenter.NullFinish
+	}
+
 	return c.instrumenter.Observe(ctx, op, c.prefix+key, string(c.typ), c.name)
 }
 
