@@ -31,7 +31,7 @@ Redis-backed cache types require Redis 6.2 or later, or any Valkey version.
 * `CACHE_TYPE` - Cache type to use in service (defaults to `memory`, allowed values are `memory`, `redis`, `redis-cluster`, `redis-sentinel`).
 * `CACHE_TTL` - Duration on how long to keep items in cache. Defaults to 0 meaning to never expire.
 * `CACHE_KEY_PREFIX` - Prefix all cache keys with specified value.
-* `CACHE_CONNECTION` - If other than memory cache is used specifies connection string on how to connect to cache storage.
+* `CACHE_CONNECTION` - If other than memory cache is used specifies connection string on how to connect to cache storage. Use the `rediss://` scheme to connect over TLS and add `skip_verify=true` to skip server certificate verification. `skip_verify=true` on a plain `redis://` connection string is rejected, since it does not select the transport.
 * `CACHE_PASSWORD` - Password to use in connection string.
 * `CACHE_PASSWORD_FILE` - File to read value for `CACHE_PASSWORD` from.
 * `CACHE_CLIENT_CACHE` - Enable server-assisted client-side caching support on Redis connections (defaults to `true`). Set to `false` for providers without `CLIENT TRACKING` support (e.g. Google Cloud Memorystore).

@@ -151,8 +151,32 @@ func newValkeyClient(copt valkey.ClientOption, o *cacheOptions) (valkey.Client, 
 	return valkey.NewClient(copt)
 }
 
+func parseRedisURL(connStr string) (valkey.ClientOption, error) {
+	copt, err := valkey.ParseURL(connStr)
+	if err != nil {
+		return valkey.ClientOption{}, err
+	}
+
+	// skip_verify only relaxes certificate verification, it does not select the transport,
+	// so reject it on a plain scheme instead of ignoring it. Up to v0.34 the parameter also
+	// turned TLS on, so such a connection string reached a TLS only server and now connects
+	// in plain text, which the server closes as soon as the first command is sent.
+	if copt.TLSConfig == nil {
+		u, err := url.Parse(connStr)
+		if err != nil {
+			return valkey.ClientOption{}, err
+		}
+
+		if skipVerify, _ := strconv.ParseBool(u.Query().Get("skip_verify")); skipVerify {
+			return valkey.ClientOption{}, fmt.Errorf("skip_verify requires a TLS scheme, use rediss:// instead of %s://", u.Scheme)
+		}
+	}
+
+	return copt, nil
+}
+
 func newRedisClient(o *cacheOptions) (valkey.Client, error) {
-	copt, err := valkey.ParseURL(o.ConnectionString)
+	copt, err := parseRedisURL(o.ConnectionString)
 	if err != nil {
 		return nil, err
 	}

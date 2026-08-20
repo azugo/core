@@ -269,7 +269,7 @@ func ValidateConnectionString(typ Type, connStr string) error {
 	//nolint:exhaustive // memory cache type require no validation
 	switch typ {
 	case RedisCache, RedisClusterCache:
-		_, err = valkey.ParseURL(connStr)
+		_, err = parseRedisURL(connStr)
 	case RedisSentinelCache:
 		_, err = parseRedisSentinelURL(connStr)
 	default:

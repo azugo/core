@@ -15,6 +15,37 @@ func getRedisConnStr() string {
 	return os.Getenv("REDIS_CONNSTR")
 }
 
+func TestParseRedisURLSkipVerify(t *testing.T) {
+	// skip_verify only relaxes verification, so it is rejected on a plain scheme rather
+	// than silently ignored: up to v0.34 it also enabled TLS.
+	_, err := parseRedisURL("redis://user@localhost:6379/8?skip_verify=true")
+	qt.Check(t, qt.ErrorMatches(err, "skip_verify requires a TLS scheme, use rediss:// instead of redis://"))
+
+	// On a TLS scheme it does what it says.
+	opt, err := parseRedisURL("rediss://localhost:6379?skip_verify=true")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNotNil(opt.TLSConfig))
+	qt.Check(t, qt.IsTrue(opt.TLSConfig.InsecureSkipVerify))
+
+	// A TLS scheme without skip_verify keeps verification on.
+	opt, err = parseRedisURL("rediss://localhost:6379")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNotNil(opt.TLSConfig))
+	qt.Check(t, qt.IsFalse(opt.TLSConfig.InsecureSkipVerify))
+
+	// A plain scheme stays plain and keeps working.
+	opt, err = parseRedisURL("redis://user@localhost:6379/8")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsNil(opt.TLSConfig))
+	qt.Check(t, qt.Equals(opt.SelectDB, 8))
+	qt.Check(t, qt.Equals(opt.Username, "user"))
+
+	// skip_verify=false asks for nothing, so it is not an error.
+	opt, err = parseRedisURL("redis://localhost:6379?skip_verify=false")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsNil(opt.TLSConfig))
+}
+
 func TestParseRedisSentinelURL(t *testing.T) {
 	opt, err := parseRedisSentinelURL("sentinel://user@s1:26379,s2:26379/mymaster?db=2")
 	qt.Assert(t, qt.IsNil(err))
