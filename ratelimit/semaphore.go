@@ -50,13 +50,8 @@ func NewSemaphore(c *cache.Cache, name string, slots int, opts ...SemaphoreOptio
 		return nil, err
 	}
 
-	con, distributed, err := connection(c)
-	if err != nil {
-		return nil, err
-	}
-
 	var b semaphoreBackend
-	if distributed {
+	if con, distributed := connection(c); distributed {
 		b = newRedisSemaphore(con, keyPrefix(c, "semaphore", name), opt)
 	} else {
 		b = newMemorySemaphore(opt)

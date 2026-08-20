@@ -119,13 +119,8 @@ func newLimiter(c *cache.Cache, name string, opt *options) (Limiter, error) {
 		return nil, errors.New("rate limiter name is required")
 	}
 
-	con, distributed, err := connection(c)
-	if err != nil {
-		return nil, err
-	}
-
 	var b limiterBackend
-	if distributed {
+	if con, distributed := connection(c); distributed {
 		b = newRedisLimiter(con, keyPrefix(c, "ratelimit", name), opt)
 	} else {
 		b = newMemoryLimiter(opt)
@@ -156,17 +151,14 @@ func NewTokenBucket(c *cache.Cache, name string, rate float64, burst int, opts .
 	return newLimiter(c, name, opt)
 }
 
-func connection(c *cache.Cache) (valkey.Client, bool, error) {
+// connection returns a lazy connection provider so that limiters can be
+// created before the cache backend connection is established.
+func connection(c *cache.Cache) (func() valkey.Client, bool) {
 	if c.ConfiguredType() == cache.MemoryCache {
-		return nil, false, nil
+		return nil, false
 	}
 
-	con := c.Connection()
-	if con == nil {
-		return nil, false, errors.New("cache must be started before creating a rate limiter")
-	}
-
-	return con, true, nil
+	return c.Connection, true
 }
 
 func keyPrefix(c *cache.Cache, kind, name string) string {

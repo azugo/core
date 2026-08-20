@@ -49,8 +49,17 @@ func TestNewValidation(t *testing.T) {
 func TestNewRedisCacheNotStarted(t *testing.T) {
 	c := cache.New(cache.RedisCache, cache.ConnectionString("redis://localhost:6379/0"))
 
-	_, err := NewFixedWindow(c, "test", 5, time.Minute)
-	qt.Check(t, qt.ErrorMatches(err, "cache must be started before creating a rate limiter"))
+	l, err := NewFixedWindow(c, "test", 5, time.Minute)
+	qt.Assert(t, qt.IsNil(err))
+
+	_, err = l.Allow(context.TODO(), "key")
+	qt.Check(t, qt.ErrorIs(err, cache.ErrCacheUnavailable))
+
+	s, err := NewSemaphore(c, "test", 1)
+	qt.Assert(t, qt.IsNil(err))
+
+	_, _, err = s.TryAcquire(context.TODO(), "key")
+	qt.Check(t, qt.ErrorIs(err, cache.ErrCacheUnavailable))
 }
 
 func TestFixedWindowAllow(t *testing.T) {

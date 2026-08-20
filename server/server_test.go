@@ -19,7 +19,8 @@ import (
 type App struct {
 	*core.App
 
-	wg sync.WaitGroup
+	stop chan struct{}
+	wg   sync.WaitGroup
 }
 
 func (a *App) Start() error {
@@ -29,13 +30,16 @@ func (a *App) Start() error {
 
 	a.wg.Add(1)
 
-	// Start should not exit
-	select {}
+	// Block until Stop like a real server would
+	<-a.stop
+
+	return nil
 }
 
 func (a *App) Stop() {
 	a.App.Stop()
 
+	close(a.stop)
 	a.wg.Done()
 }
 
@@ -50,13 +54,17 @@ func TestApp(t *testing.T) {
 	qt.Assert(t, qt.IsNil(err))
 	_ = test.ObservedLogs(a)
 	app := &App{
-		App: a,
+		App:  a,
+		stop: make(chan struct{}),
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	go RunContext(ctx, app)
+	wg := sync.WaitGroup{}
+	wg.Go(func() {
+		RunContext(ctx, app)
+	})
 	time.Sleep(100 * time.Millisecond)
 
 	qt.Check(t, qt.IsTrue(app.Config().Ready()))
@@ -71,6 +79,7 @@ func TestApp(t *testing.T) {
 	proc.Signal(os.Interrupt)
 
 	// Wait for app to finish
+	wg.Wait()
 	app.wg.Wait()
 }
 
@@ -114,7 +123,7 @@ func TestAppLogStartWithBlockingStart(t *testing.T) {
 	})
 	qt.Assert(t, qt.IsNil(err))
 	logs := test.ObservedLogs(a)
-	app := &App{App: a}
+	app := &App{App: a, stop: make(chan struct{})}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()

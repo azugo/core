@@ -58,6 +58,67 @@ func TestParseRedisSentinelURLErrors(t *testing.T) {
 	qt.Check(t, qt.IsNotNil(err))
 }
 
+func TestValidateConnectionStringSkipVerify(t *testing.T) {
+	err := ValidateConnectionString(RedisCache, "redis://localhost:6379/0?skip_verify=true")
+	qt.Check(t, qt.ErrorMatches(err, "skip_verify requires a TLS connection string scheme"))
+
+	err = ValidateConnectionString(RedisSentinelCache, "sentinel://s1:26379/mymaster?skip_verify=true")
+	qt.Check(t, qt.ErrorMatches(err, "skip_verify requires a TLS connection string scheme"))
+
+	qt.Check(t, qt.IsNil(ValidateConnectionString(RedisCache, "rediss://localhost:6379/0?skip_verify=true")))
+	qt.Check(t, qt.IsNil(ValidateConnectionString(RedisSentinelCache, "sentinels://s1:26379/mymaster?skip_verify=true")))
+	qt.Check(t, qt.IsNil(ValidateConnectionString(RedisCache, "redis://localhost:6379/0?skip_verify=false")))
+	qt.Check(t, qt.IsNil(ValidateConnectionString(RedisCache, "redis://localhost:6379/0")))
+}
+
+func TestRedisCacheStartUnreachable(t *testing.T) {
+	ctx := t.Context()
+
+	c := New(RedisCache, ConnectionString("redis://localhost:1/0"))
+	err := c.Start(ctx)
+	qt.Assert(t, qt.IsNil(err))
+	defer c.Close()
+
+	qt.Check(t, qt.ErrorIs(c.Ping(ctx), ErrCacheUnavailable))
+
+	i, err := Create[string](c, "test")
+	qt.Assert(t, qt.IsNil(err))
+
+	_, err = i.Get(ctx, "key")
+	qt.Check(t, qt.ErrorIs(err, ErrCacheUnavailable))
+
+	err = i.Set(ctx, "key", "value")
+	qt.Check(t, qt.ErrorIs(err, ErrCacheUnavailable))
+
+	c.Close()
+
+	_, err = i.Get(ctx, "key")
+	qt.Check(t, qt.ErrorIs(err, ErrCacheClosed))
+}
+
+func TestRedisCacheInstanceOwnConnectionUnreachable(t *testing.T) {
+	ctx := t.Context()
+
+	c := New(RedisCache, ConnectionString("redis://localhost:1/0"))
+	qt.Assert(t, qt.IsNil(c.Start(ctx)))
+	defer c.Close()
+
+	i, err := Create[string](c, "test", ConnectionString("redis://localhost:2/0"))
+	qt.Assert(t, qt.IsNil(err))
+
+	_, err = i.Get(ctx, "key")
+	qt.Check(t, qt.ErrorIs(err, ErrCacheUnavailable))
+
+	_, err = Create[string](c, "test2", ConnectionString("http://localhost:6379"))
+	qt.Check(t, qt.IsNotNil(err))
+}
+
+func TestRedisCacheStartInvalidConnectionString(t *testing.T) {
+	c := New(RedisCache, ConnectionString("http://localhost:6379"))
+	err := c.Start(context.TODO())
+	qt.Check(t, qt.IsNotNil(err))
+}
+
 func TestRedisCacheGetSet(t *testing.T) {
 	cs := getRedisConnStr()
 	if cs == "" {

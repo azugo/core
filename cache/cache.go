@@ -9,6 +9,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
+	"strconv"
+	"sync"
 
 	"github.com/valkey-io/valkey-go"
 )
@@ -28,6 +31,10 @@ const (
 // ErrCacheClosed is returned when an operation is attempted on a closed cache.
 var ErrCacheClosed = errors.New("cache closed")
 
+// ErrCacheUnavailable is returned when the cache backend connection is not
+// established or is lost.
+var ErrCacheUnavailable = errors.New("cache connection unavailable")
+
 // KeyNotFoundError is returned when a cache key is not found.
 type KeyNotFoundError struct {
 	Key string
@@ -41,15 +48,20 @@ func (e KeyNotFoundError) Error() string {
 type Cache struct {
 	options     []Option
 	cache       map[string]any
+	mu          sync.RWMutex
 	redisCon    valkey.Client
 	redisConStr string
+	closed      bool
+	bgctx       context.Context
 }
 
 // New creates a new cache with specified type.
 func New(opts ...Option) *Cache {
 	return &Cache{
-		options: opts,
-		cache:   make(map[string]any),
+		options:     opts,
+		cache:       make(map[string]any),
+		redisConStr: newCacheOptions(opts...).ConnectionString,
+		bgctx:       context.Background(),
 	}
 }
 
@@ -77,7 +89,13 @@ type InstancePinger interface {
 }
 
 // Start cache.
+//
+// An unreachable backend does not fail the start; the connection is retried
+// in the background and operations return ErrCacheUnavailable until it is
+// established.
 func (c *Cache) Start(ctx context.Context) error {
+	c.bgctx = ctx
+
 	opt := newCacheOptions(c.options...)
 
 	finish := opt.Instrumenter.Observe(ctx, InstrumentationStart)
@@ -88,31 +106,48 @@ func (c *Cache) Start(ctx context.Context) error {
 		return nil
 	}
 
-	var (
-		con valkey.Client
-		err error
-	)
-
-	//nolint:exhaustive // check is already done above
-	switch opt.Type {
-	case RedisCache, RedisClusterCache:
-		con, err = newRedisClient(opt)
-	case RedisSentinelCache:
-		con, err = newRedisSentinelClient(opt)
-	}
-
-	if err != nil {
+	if err := ValidateConnectionString(opt.Type, opt.ConnectionString); err != nil {
 		finish(err)
 
 		return err
 	}
 
+	con, err := newRedisConnection(opt)
+	if err != nil {
+		finish(err)
+
+		go c.reconnect(ctx, opt)
+
+		return nil
+	}
+
+	c.mu.Lock()
 	c.redisCon = con
-	c.redisConStr = opt.ConnectionString
+	c.mu.Unlock()
 
 	finish(nil)
 
 	return nil
+}
+
+// reconnect retries the shared connection with exponential backoff until it
+// succeeds, the cache is closed or ctx is cancelled.
+func (c *Cache) reconnect(ctx context.Context, opt *cacheOptions) {
+	con, err := connectRetry(ctx, opt)
+	if err != nil {
+		return
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.closed {
+		con.Close()
+
+		return
+	}
+
+	c.redisCon = con
 }
 
 // Close cache and all its instances.
@@ -122,28 +157,31 @@ func (c *Cache) Close() {
 	finish := opt.Instrumenter.Observe(context.Background(), InstrumentationClose)
 	defer finish(nil)
 
-	switch opt.Type {
-	case RedisCache, RedisClusterCache, RedisSentinelCache:
-		if c.redisCon != nil {
-			c.redisCon.Close()
-		}
+	c.mu.Lock()
+	c.closed = true
+	instances := c.cache
+	c.cache = nil
+	con := c.redisCon
+	c.redisCon = nil
+	c.mu.Unlock()
 
-		c.redisCon = nil
-	case MemoryCache:
-		// nothing to close
-	}
-
-	for _, i := range c.cache {
+	for _, i := range instances {
 		if c, ok := i.(InstanceCloser); ok {
 			c.Close()
 		}
 	}
 
-	c.cache = nil
+	if con != nil {
+		con.Close()
+	}
 }
 
-// Connection returns the underlying Redis client shared by the cache.
+// Connection returns the underlying Redis client shared by the cache or nil
+// if the connection is not established.
 func (c *Cache) Connection() valkey.Client {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	return c.redisCon
 }
 
@@ -168,15 +206,31 @@ func (c *Cache) Ping(ctx context.Context) error {
 
 	finish := opt.Instrumenter.Observe(ctx, InstrumentationPing)
 
-	if opt.Type != MemoryCache && c.redisCon != nil {
-		if err := c.redisCon.Do(ctx, c.redisCon.B().Ping().Build()).Error(); err != nil {
+	if opt.Type != MemoryCache {
+		con := c.Connection()
+		if con == nil {
+			finish(ErrCacheUnavailable)
+
+			return ErrCacheUnavailable
+		}
+
+		if err := connError(con.Do(ctx, con.B().Ping().Build()).Error()); err != nil {
 			finish(err)
 
 			return err
 		}
 	}
 
+	c.mu.RLock()
+
+	instances := make([]any, 0, len(c.cache))
 	for _, i := range c.cache {
+		instances = append(instances, i)
+	}
+
+	c.mu.RUnlock()
+
+	for _, i := range instances {
 		if c, ok := i.(InstancePinger); ok {
 			if err := c.Ping(ctx); err != nil {
 				finish(err)
@@ -193,7 +247,10 @@ func (c *Cache) Ping(ctx context.Context) error {
 
 // Get returns pre-configured cache instance by name.
 func Get[T any](cache *Cache, name string) (Instance[T], error) {
+	cache.mu.RLock()
 	i, ok := cache.cache[name]
+	cache.mu.RUnlock()
+
 	if !ok {
 		return nil, errors.New("cache not found")
 	}
@@ -223,29 +280,21 @@ func Create[T any](cache *Cache, name string, opts ...Option) (Instance[T], erro
 		if err != nil {
 			return nil, err
 		}
-	case RedisCache, RedisClusterCache:
-		con := cache.redisCon
-		if o.ConnectionString != cache.redisConStr {
-			con, err = newRedisClient(o)
-			if err != nil {
-				return nil, err
-			}
+	case RedisCache, RedisClusterCache, RedisSentinelCache:
+		c, err = newRedisCache[T](name, cache, opt...)
+		if err != nil {
+			return nil, err
 		}
-
-		c = newRedisCache[T](name, con, opt...)
-	case RedisSentinelCache:
-		con := cache.redisCon
-		if o.ConnectionString != cache.redisConStr {
-			con, err = newRedisSentinelClient(o)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		c = newRedisCache[T](name, con, opt...)
 	}
 
 	if c != nil {
+		cache.mu.Lock()
+		defer cache.mu.Unlock()
+
+		if cache.closed {
+			return nil, ErrCacheClosed
+		}
+
 		cache.cache[name] = c
 
 		return c, nil
@@ -264,17 +313,32 @@ func ValidateConnectionString(typ Type, connStr string) error {
 		return errors.New("connection string can not be empty")
 	}
 
-	var err error
+	var (
+		copt valkey.ClientOption
+		err  error
+	)
 
 	//nolint:exhaustive // memory cache type require no validation
 	switch typ {
 	case RedisCache, RedisClusterCache:
-		_, err = valkey.ParseURL(connStr)
+		copt, err = valkey.ParseURL(connStr)
 	case RedisSentinelCache:
-		_, err = parseRedisSentinelURL(connStr)
+		copt, err = parseRedisSentinelURL(connStr)
 	default:
 		return fmt.Errorf("unsupported cache type: %v", typ)
 	}
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	if copt.TLSConfig == nil {
+		if u, err := url.Parse(connStr); err == nil {
+			if ok, _ := strconv.ParseBool(u.Query().Get("skip_verify")); ok {
+				return errors.New("skip_verify requires a TLS connection string scheme")
+			}
+		}
+	}
+
+	return nil
 }

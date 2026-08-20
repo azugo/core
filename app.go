@@ -39,7 +39,8 @@ type App struct {
 	config *config.Configuration
 
 	// Cache
-	cache *cache.Cache
+	cachelock sync.Mutex
+	cache     *cache.Cache
 
 	// HTTP client
 	httpClient http.Client

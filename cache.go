@@ -6,9 +6,14 @@ package core
 
 import (
 	"azugo.io/core/cache"
+
+	"go.uber.org/zap"
 )
 
 func (a *App) initCache() error {
+	a.cachelock.Lock()
+	defer a.cachelock.Unlock()
+
 	if a.cache != nil {
 		return nil
 	}
@@ -47,12 +52,25 @@ func (a *App) initCache() error {
 		opts = append(opts, cache.ClientCacheSize(conf.ClientCacheSize))
 	}
 
-	a.cache = cache.New(opts...)
+	c := cache.New(opts...)
 
-	return a.cache.Start(a.BackgroundContext())
+	if err := c.Start(a.BackgroundContext()); err != nil {
+		return err
+	}
+
+	if err := c.Ping(a.BackgroundContext()); err != nil {
+		a.Log().Warn("cache backend is unreachable, reconnecting in background", zap.Error(err))
+	}
+
+	a.cache = c
+
+	return nil
 }
 
 func (a *App) closeCache() {
+	a.cachelock.Lock()
+	defer a.cachelock.Unlock()
+
 	if a.cache == nil {
 		return
 	}
@@ -62,11 +80,12 @@ func (a *App) closeCache() {
 
 // Cache returns the application cache instance, initializing it on first use.
 func (a *App) Cache() *cache.Cache {
-	if a.cache == nil {
-		if err := a.initCache(); err != nil {
-			panic(err)
-		}
+	if err := a.initCache(); err != nil {
+		panic(err)
 	}
+
+	a.cachelock.Lock()
+	defer a.cachelock.Unlock()
 
 	return a.cache
 }

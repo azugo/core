@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"time"
 
+	"azugo.io/core/cache"
+
 	"github.com/valkey-io/valkey-go"
 )
 
@@ -169,7 +171,7 @@ return {0, math.ceil(tonumber(first[2]) - now)}
 )
 
 type redisLimiter struct {
-	con    valkey.Client
+	con    func() valkey.Client
 	prefix string
 	opt    *options
 	// Token bucket script arguments are constant per limiter and formatted
@@ -178,7 +180,7 @@ type redisLimiter struct {
 	tauArg      string
 }
 
-func newRedisLimiter(con valkey.Client, prefix string, opt *options) *redisLimiter {
+func newRedisLimiter(con func() valkey.Client, prefix string, opt *options) *redisLimiter {
 	r := &redisLimiter{con: con, prefix: prefix, opt: opt}
 
 	if opt.strategy == strategyTokenBucket {
@@ -199,11 +201,16 @@ func (r *redisLimiter) allowN(ctx context.Context, key string, n int, peek bool,
 }
 
 func (r *redisLimiter) fixedWindow(ctx context.Context, key string, n int, peek bool, limit int) (Result, error) {
+	con := r.con()
+	if con == nil {
+		return Result{}, cache.ErrCacheUnavailable
+	}
+
 	if limit <= 0 {
 		limit = r.opt.limit
 	}
 
-	vals, err := fixedWindowScript.Exec(ctx, r.con, []string{r.prefix + key}, []string{
+	vals, err := fixedWindowScript.Exec(ctx, con, []string{r.prefix + key}, []string{
 		strconv.Itoa(limit),
 		strconv.FormatInt(r.opt.window.Milliseconds(), 10),
 		strconv.Itoa(n),
@@ -217,6 +224,11 @@ func (r *redisLimiter) fixedWindow(ctx context.Context, key string, n int, peek 
 }
 
 func (r *redisLimiter) tokenBucket(ctx context.Context, key string, n int, peek bool, limit int) (Result, error) {
+	con := r.con()
+	if con == nil {
+		return Result{}, cache.ErrCacheUnavailable
+	}
+
 	burst := r.opt.burst
 	tauArg := r.tauArg
 
@@ -225,7 +237,7 @@ func (r *redisLimiter) tokenBucket(ctx context.Context, key string, n int, peek 
 		tauArg = strconv.FormatFloat((1000/r.opt.rate)*float64(burst), 'f', -1, 64)
 	}
 
-	vals, err := tokenBucketScript.Exec(ctx, r.con, []string{r.prefix + key}, []string{
+	vals, err := tokenBucketScript.Exec(ctx, con, []string{r.prefix + key}, []string{
 		r.emissionArg,
 		tauArg,
 		strconv.Itoa(n),
@@ -240,21 +252,31 @@ func (r *redisLimiter) tokenBucket(ctx context.Context, key string, n int, peek 
 }
 
 func (r *redisLimiter) reset(ctx context.Context, key string) error {
-	return r.con.Do(ctx, r.con.B().Del().Key(r.prefix+key).Build()).Error()
+	con := r.con()
+	if con == nil {
+		return cache.ErrCacheUnavailable
+	}
+
+	return con.Do(ctx, con.B().Del().Key(r.prefix+key).Build()).Error()
 }
 
 type redisSemaphore struct {
-	con    valkey.Client
+	con    func() valkey.Client
 	prefix string
 	opt    *options
 }
 
-func newRedisSemaphore(con valkey.Client, prefix string, opt *options) *redisSemaphore {
+func newRedisSemaphore(con func() valkey.Client, prefix string, opt *options) *redisSemaphore {
 	return &redisSemaphore{con: con, prefix: prefix, opt: opt}
 }
 
 func (r *redisSemaphore) acquire(ctx context.Context, key, token string) (bool, time.Duration, error) {
-	vals, err := semaphoreAcquireScript.Exec(ctx, r.con, []string{r.prefix + key}, []string{
+	con := r.con()
+	if con == nil {
+		return false, 0, cache.ErrCacheUnavailable
+	}
+
+	vals, err := semaphoreAcquireScript.Exec(ctx, con, []string{r.prefix + key}, []string{
 		strconv.Itoa(r.opt.slots),
 		strconv.FormatInt(r.opt.leaseTTL.Milliseconds(), 10),
 		token,
@@ -281,7 +303,12 @@ func (r *redisSemaphore) acquire(ctx context.Context, key, token string) (bool, 
 }
 
 func (r *redisSemaphore) release(ctx context.Context, key, token string) error {
-	return r.con.Do(ctx, r.con.B().Zrem().Key(r.prefix+key).Member(token).Build()).Error()
+	con := r.con()
+	if con == nil {
+		return cache.ErrCacheUnavailable
+	}
+
+	return con.Do(ctx, con.B().Zrem().Key(r.prefix+key).Member(token).Build()).Error()
 }
 
 func parseLimiterReply(vals []valkey.ValkeyMessage) (Result, error) {

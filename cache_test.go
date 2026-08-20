@@ -53,6 +53,10 @@ func TestCacheInstrumentation(t *testing.T) {
 		cache.InstrumentationStart,
 		cache.InstrumentationStart + ":end",
 
+		// Startup health check.
+		cache.InstrumentationPing,
+		cache.InstrumentationPing + ":end",
+
 		cache.InstrumentationSet,
 		cache.InstrumentationSet + ":end",
 
