@@ -31,7 +31,7 @@ linters:
     - godot
     - goheader
     - gomoddirectives
-    - gomodguard
+    - gomodguard_v2
     - goprintffuncname
     - gosec
     - gosmopolitan
@@ -101,7 +101,6 @@ linters:
 formatters:
   enable:
     - gci
-    - gofmt
     - gofumpt
     - goimports
 
