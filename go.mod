@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/cenkalti/backoff/v7 v7.0.0
 	github.com/dgraph-io/ristretto/v2 v2.4.2
-	github.com/go-playground/validator/v10 v10.30.3
+	github.com/go-playground/validator/v10 v10.30.4
 	github.com/go-quicktest/qt v1.102.0
 	github.com/goccy/go-json v0.10.6
 	github.com/lafriks/pkcs8 v1.2.4
@@ -18,7 +18,7 @@ require (
 	github.com/valyala/fasthttp v1.73.0
 	go.elastic.co/ecszap v1.0.3
 	go.uber.org/zap v1.28.0
-	golang.org/x/crypto v0.55.0
+	golang.org/x/crypto v0.56.0
 )
 
 require (
