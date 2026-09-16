@@ -253,6 +253,7 @@ func (c *memoryCache[T]) Pop(ctx context.Context, key string) (T, error) {
 		}
 
 		c.serializedCache.Del(key)
+		c.serializedCache.Wait()
 
 		v, err := c.unmarshal(b)
 		finish(err)
@@ -274,6 +275,7 @@ func (c *memoryCache[T]) Pop(ctx context.Context, key string) (T, error) {
 	}
 
 	c.cache.Del(key)
+	c.cache.Wait()
 
 	finish(nil)
 
