@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
@@ -21,8 +22,7 @@ func TestMemoryCacheGetSet(t *testing.T) {
 
 	err = i.Set(context.TODO(), "key", "value")
 	qt.Check(t, qt.IsNil(err))
-
-	time.Sleep(10 * time.Millisecond)
+	qt.Assert(t, qt.IsNil(i.Sync(context.TODO())))
 	val, err := i.Get(context.TODO(), "key")
 	qt.Check(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(val, "value"))
@@ -39,8 +39,7 @@ func TestMemoryCachePop(t *testing.T) {
 
 	err = i.Set(context.TODO(), "key", "value")
 	qt.Check(t, qt.IsNil(err))
-
-	time.Sleep(10 * time.Millisecond)
+	qt.Assert(t, qt.IsNil(i.Sync(context.TODO())))
 	val, err := i.Pop(context.TODO(), "key")
 	qt.Check(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(val, "value"))
@@ -61,8 +60,7 @@ func TestMemoryCacheDelete(t *testing.T) {
 
 	err = i.Set(context.TODO(), "key", "value")
 	qt.Check(t, qt.IsNil(err))
-
-	time.Sleep(10 * time.Millisecond)
+	qt.Assert(t, qt.IsNil(i.Sync(context.TODO())))
 	err = i.Delete(context.TODO(), "key")
 	qt.Check(t, qt.IsNil(err))
 
@@ -133,8 +131,7 @@ func TestMemoryCacheGetHit(t *testing.T) {
 
 		err = i.Set(context.TODO(), "key", "value")
 		qt.Check(t, qt.IsNil(err))
-
-		time.Sleep(10 * time.Millisecond)
+		qt.Assert(t, qt.IsNil(i.Sync(context.TODO())))
 
 		val, err := i.Get(context.TODO(), "key")
 		qt.Check(t, qt.IsNil(err))
@@ -147,5 +144,23 @@ func TestMemoryCacheGetHit(t *testing.T) {
 		qt.Check(t, qt.Equals(hits, 1))
 
 		c.Close()
+	}
+}
+
+func TestMemoryCacheSyncMakesWritesVisible(t *testing.T) {
+	c := New(MemoryCache)
+	qt.Assert(t, qt.IsNil(c.Start(context.TODO())))
+
+	i, err := Create[string](c, "sync")
+	qt.Assert(t, qt.IsNil(err))
+
+	for n := range 1000 {
+		key := "k" + strconv.Itoa(n)
+		qt.Assert(t, qt.IsNil(i.Set(context.TODO(), key, "v")))
+		qt.Assert(t, qt.IsNil(i.Sync(context.TODO())))
+
+		v, err := i.Get(context.TODO(), key)
+		qt.Assert(t, qt.IsNil(err))
+		qt.Assert(t, qt.Equals(v, "v"))
 	}
 }

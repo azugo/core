@@ -75,6 +75,8 @@ type Instance[T any] interface {
 	Set(ctx context.Context, key string, value T, opts ...ItemOption[T]) error
 	// Delete value from cache.
 	Delete(ctx context.Context, key string) error
+	// Sync blocks until every write issued so far is visible to reads.
+	Sync(ctx context.Context) error
 }
 
 // InstanceCloser represents a cache instance close method.

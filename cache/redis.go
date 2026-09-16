@@ -356,6 +356,11 @@ func (c *redisCache[T]) Get(ctx context.Context, key string, opts ...ItemOption[
 	return *val, nil
 }
 
+// Sync is a no-op: Redis applies writes synchronously.
+func (c *redisCache[T]) Sync(context.Context) error {
+	return nil
+}
+
 func (c *redisCache[T]) Pop(ctx context.Context, key string) (T, error) {
 	val := new(T)
 

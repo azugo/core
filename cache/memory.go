@@ -209,6 +209,27 @@ func (c *memoryCache[T]) set(key string, v T, ttl time.Duration) error {
 	return nil
 }
 
+// Sync waits until every buffered write has been applied.
+func (c *memoryCache[T]) Sync(context.Context) error {
+	if c.serialize {
+		if c.serializedCache == nil {
+			return ErrCacheClosed
+		}
+
+		c.serializedCache.Wait()
+
+		return nil
+	}
+
+	if c.cache == nil {
+		return ErrCacheClosed
+	}
+
+	c.cache.Wait()
+
+	return nil
+}
+
 func (c *memoryCache[T]) Pop(ctx context.Context, key string) (T, error) {
 	var val T
 
