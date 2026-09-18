@@ -6,6 +6,7 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -297,6 +298,135 @@ func (c *memoryCache[T]) Set(ctx context.Context, key string, value T, opts ...I
 	finish(err)
 
 	return err
+}
+
+// Add stores value under key when no value is present.
+func (c *memoryCache[T]) Add(ctx context.Context, key string, value T, opts ...ItemOption[T]) (bool, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	finish := c.observe(ctx, InstrumentationSet, key)
+
+	_, found, err := c.peek(key)
+	if err != nil || found {
+		finish(err)
+
+		return false, err
+	}
+
+	if err := c.write(key, value, opts...); err != nil {
+		finish(err)
+
+		return false, err
+	}
+
+	finish(nil)
+
+	return true, nil
+}
+
+// Swap stores value under key and returns the value it replaced.
+func (c *memoryCache[T]) Swap(ctx context.Context, key string, value T, opts ...ItemOption[T]) (T, bool, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	finish := c.observe(ctx, InstrumentationSet, key)
+
+	prev, found, err := c.peek(key)
+	if err != nil {
+		finish(err)
+
+		return prev, false, err
+	}
+
+	if err := c.write(key, value, opts...); err != nil {
+		finish(err)
+
+		return prev, false, err
+	}
+
+	finish(nil)
+
+	return prev, found, nil
+}
+
+// Expire sets the remaining lifetime of key, keeping its value.
+func (c *memoryCache[T]) Expire(ctx context.Context, key string, ttl time.Duration) (bool, error) {
+	if ttl <= 0 {
+		return false, errors.New("cache: expire requires a positive ttl")
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	finish := c.observe(ctx, InstrumentationSet, key)
+
+	// Ristretto cannot re-time an entry in place, so the value is written back unchanged.
+	val, found, err := c.peek(key)
+	if err != nil || !found {
+		finish(err)
+
+		return false, err
+	}
+
+	if err := c.write(key, val, TTL[T](ttl)); err != nil {
+		finish(err)
+
+		return false, err
+	}
+
+	finish(nil)
+
+	return true, nil
+}
+
+// peek returns the stored value without recording a hit or consulting the loader.
+func (c *memoryCache[T]) peek(key string) (T, bool, error) {
+	var val T
+
+	if c.serialize {
+		if c.serializedCache == nil {
+			return val, false, ErrCacheClosed
+		}
+
+		b, found := c.serializedCache.Get(key)
+		if !found {
+			return val, false, nil
+		}
+
+		v, err := c.unmarshal(b)
+
+		return v, err == nil, err
+	}
+
+	if c.cache == nil {
+		return val, false, ErrCacheClosed
+	}
+
+	v, found := c.cache.Get(key)
+
+	return v, found, nil
+}
+
+// write stores value and blocks until it is visible, so a caller holding the lock is never
+// overtaken by its own pending write.
+func (c *memoryCache[T]) write(key string, value T, opts ...ItemOption[T]) error {
+	ttl := newItemOptions(opts...).TTL
+	if ttl == 0 {
+		ttl = c.ttl
+	}
+
+	if err := c.set(key, value, ttl); err != nil {
+		return err
+	}
+
+	if c.serialize {
+		c.serializedCache.Wait()
+	} else {
+		c.cache.Wait()
+	}
+
+	return nil
 }
 
 func (c *memoryCache[T]) Delete(ctx context.Context, key string) error {

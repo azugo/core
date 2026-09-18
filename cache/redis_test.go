@@ -305,3 +305,55 @@ func TestRedisCacheClientCacheDisabledFallback(t *testing.T) {
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(val, "value"))
 }
+
+func TestRedisCacheAddSwapExpire(t *testing.T) {
+	cs := getRedisConnStr()
+	if cs == "" {
+		t.Skip("REDIS_CONNSTR is not set")
+	}
+
+	c := New(RedisCache, KeyPrefix("prefix"), ConnectionString(cs))
+	qt.Assert(t, qt.IsNil(c.Start(context.TODO())))
+
+	defer c.Close()
+
+	i, err := Create[string](c, "test")
+	qt.Assert(t, qt.IsNil(err))
+
+	qt.Assert(t, qt.IsNil(i.Delete(context.TODO(), "atomic")))
+
+	added, err := i.Add(context.TODO(), "atomic", "first")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(added))
+
+	added, err = i.Add(context.TODO(), "atomic", "second")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsFalse(added))
+
+	prev, found, err := i.Swap(context.TODO(), "atomic", "third", TTL[string](30*time.Millisecond))
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(found))
+	qt.Check(t, qt.Equals(prev, "first"))
+
+	applied, err := i.Expire(context.TODO(), "atomic", time.Minute)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(applied))
+
+	// The short lifetime set by Swap has passed; Expire kept the entry alive unchanged.
+	time.Sleep(60 * time.Millisecond)
+
+	val, err := i.Get(context.TODO(), "atomic")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(val, "third"))
+
+	qt.Assert(t, qt.IsNil(i.Delete(context.TODO(), "atomic")))
+
+	applied, err = i.Expire(context.TODO(), "atomic", time.Minute)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsFalse(applied))
+
+	prev, found, err = i.Swap(context.TODO(), "atomic", "fresh")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsFalse(found))
+	qt.Check(t, qt.Equals(prev, ""))
+}

@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/valkey-io/valkey-go"
 )
@@ -73,6 +74,12 @@ type Instance[T any] interface {
 	Pop(ctx context.Context, key string) (T, error)
 	// Set value in cache.
 	Set(ctx context.Context, key string, value T, opts ...ItemOption[T]) error
+	// Add stores value under key only when no value is present.
+	Add(ctx context.Context, key string, value T, opts ...ItemOption[T]) (bool, error)
+	// Swap stores value under key and returns the value it replaced.
+	Swap(ctx context.Context, key string, value T, opts ...ItemOption[T]) (T, bool, error)
+	// Expire sets the remaining lifetime of key without changing its value.
+	Expire(ctx context.Context, key string, ttl time.Duration) (bool, error)
 	// Delete value from cache.
 	Delete(ctx context.Context, key string) error
 	// Sync blocks until every write issued so far is visible to reads.

@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -163,4 +164,160 @@ func TestMemoryCacheSyncMakesWritesVisible(t *testing.T) {
 		qt.Assert(t, qt.IsNil(err))
 		qt.Assert(t, qt.Equals(v, "v"))
 	}
+}
+
+func TestMemoryCacheAdd(t *testing.T) {
+	c := New(MemoryCache)
+	qt.Assert(t, qt.IsNil(c.Start(context.TODO())))
+
+	defer c.Close()
+
+	i, err := Create[string](c, "test")
+	qt.Assert(t, qt.IsNil(err))
+
+	added, err := i.Add(context.TODO(), "key", "first")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(added))
+
+	added, err = i.Add(context.TODO(), "key", "second")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsFalse(added))
+
+	val, err := i.Get(context.TODO(), "key")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(val, "first"))
+}
+
+func TestMemoryCacheAddHasOneWinner(t *testing.T) {
+	c := New(MemoryCache)
+	qt.Assert(t, qt.IsNil(c.Start(context.TODO())))
+
+	defer c.Close()
+
+	i, err := Create[string](c, "test")
+	qt.Assert(t, qt.IsNil(err))
+
+	const racers = 16
+
+	var (
+		wg   sync.WaitGroup
+		mu   sync.Mutex
+		wins int
+	)
+
+	wg.Add(racers)
+
+	for n := range racers {
+		go func() {
+			defer wg.Done()
+
+			added, err := i.Add(context.TODO(), "key", strconv.Itoa(n))
+			qt.Check(t, qt.IsNil(err))
+
+			if added {
+				mu.Lock()
+				wins++
+				mu.Unlock()
+			}
+		}()
+	}
+
+	wg.Wait()
+	qt.Check(t, qt.Equals(wins, 1))
+}
+
+func TestMemoryCacheSwap(t *testing.T) {
+	c := New(MemoryCache)
+	qt.Assert(t, qt.IsNil(c.Start(context.TODO())))
+
+	defer c.Close()
+
+	i, err := Create[string](c, "test")
+	qt.Assert(t, qt.IsNil(err))
+
+	prev, found, err := i.Swap(context.TODO(), "key", "first")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsFalse(found))
+	qt.Check(t, qt.Equals(prev, ""))
+
+	prev, found, err = i.Swap(context.TODO(), "key", "second")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(found))
+	qt.Check(t, qt.Equals(prev, "first"))
+
+	val, err := i.Get(context.TODO(), "key")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(val, "second"))
+}
+
+func TestMemoryCacheSwapHandsOutEachPredecessorOnce(t *testing.T) {
+	c := New(MemoryCache)
+	qt.Assert(t, qt.IsNil(c.Start(context.TODO())))
+
+	defer c.Close()
+
+	i, err := Create[string](c, "test")
+	qt.Assert(t, qt.IsNil(err))
+
+	const racers = 16
+
+	var (
+		wg   sync.WaitGroup
+		mu   sync.Mutex
+		seen = make(map[string]int, racers)
+	)
+
+	wg.Add(racers)
+
+	for n := range racers {
+		go func() {
+			defer wg.Done()
+
+			prev, _, err := i.Swap(context.TODO(), "key", strconv.Itoa(n))
+			qt.Check(t, qt.IsNil(err))
+
+			mu.Lock()
+			seen[prev]++
+			mu.Unlock()
+		}()
+	}
+
+	wg.Wait()
+
+	// No predecessor is observed twice, so no update was lost.
+	for _, count := range seen {
+		qt.Check(t, qt.Equals(count, 1))
+	}
+}
+
+func TestMemoryCacheExpireExtendsWithoutChangingValue(t *testing.T) {
+	c := New(MemoryCache)
+	qt.Assert(t, qt.IsNil(c.Start(context.TODO())))
+
+	defer c.Close()
+
+	i, err := Create[string](c, "test")
+	qt.Assert(t, qt.IsNil(err))
+
+	// A missing key reports absent.
+	applied, err := i.Expire(context.TODO(), "key", time.Minute)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsFalse(applied))
+
+	qt.Assert(t, qt.IsNil(i.Set(context.TODO(), "key", "value", TTL[string](30*time.Millisecond))))
+	qt.Assert(t, qt.IsNil(i.Sync(context.TODO())))
+
+	applied, err = i.Expire(context.TODO(), "key", time.Minute)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(applied))
+
+	// The original lifetime has passed, but the extended entry is still there, unchanged.
+	time.Sleep(60 * time.Millisecond)
+
+	val, err := i.Get(context.TODO(), "key")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(val, "value"))
+
+	_, err = i.Expire(context.TODO(), "key", 0)
+	qt.Check(t, qt.IsNotNil(err))
 }

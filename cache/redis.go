@@ -445,6 +445,145 @@ func (c *redisCache[T]) Set(ctx context.Context, key string, value T, opts ...It
 	return nil
 }
 
+// Add stores value under key when no value is present.
+func (c *redisCache[T]) Add(ctx context.Context, key string, value T, opts ...ItemOption[T]) (bool, error) {
+	con, err := c.connection()
+	if err != nil {
+		return false, err
+	}
+
+	finish := c.observe(ctx, InstrumentationSet, key)
+
+	buf, err := json.Marshal(value)
+	if err != nil {
+		err = fmt.Errorf("invalid cache value: %w", err)
+		finish(err)
+
+		return false, err
+	}
+
+	opt := newItemOptions(opts...)
+
+	ttl := c.ttl
+	if opt.TTL != 0 {
+		ttl = opt.TTL
+	}
+
+	cmd := con.B().Set().Key(c.prefix + key).Value(string(buf)).Nx()
+
+	var completed valkey.Completed
+	if ttl > 0 {
+		completed = cmd.Px(ttl).Build()
+	} else {
+		completed = cmd.Build()
+	}
+
+	err = con.Do(ctx, completed).Error()
+	if valkey.IsValkeyNil(err) {
+		finish(nil)
+
+		return false, nil
+	}
+
+	if err != nil {
+		err = connError(err)
+		finish(err)
+
+		return false, err
+	}
+
+	finish(nil)
+
+	return true, nil
+}
+
+// Swap stores value under key and returns the value it replaced.
+func (c *redisCache[T]) Swap(ctx context.Context, key string, value T, opts ...ItemOption[T]) (T, bool, error) {
+	val := new(T)
+
+	con, err := c.connection()
+	if err != nil {
+		return *val, false, err
+	}
+
+	finish := c.observe(ctx, InstrumentationSet, key)
+
+	buf, err := json.Marshal(value)
+	if err != nil {
+		err = fmt.Errorf("invalid cache value: %w", err)
+		finish(err)
+
+		return *val, false, err
+	}
+
+	opt := newItemOptions(opts...)
+
+	ttl := c.ttl
+	if opt.TTL != 0 {
+		ttl = opt.TTL
+	}
+
+	cmd := con.B().Set().Key(c.prefix + key).Value(string(buf)).Get()
+
+	var completed valkey.Completed
+	if ttl > 0 {
+		completed = cmd.Px(ttl).Build()
+	} else {
+		completed = cmd.Build()
+	}
+
+	v, err := con.Do(ctx, completed).ToString()
+	if valkey.IsValkeyNil(err) {
+		finish(nil)
+
+		return *val, false, nil
+	}
+
+	if err != nil {
+		err = connError(err)
+		finish(err)
+
+		return *val, false, err
+	}
+
+	if err := json.Unmarshal([]byte(v), val); err != nil {
+		err = fmt.Errorf("invalid cache value: %w", err)
+		finish(err)
+
+		return *val, false, err
+	}
+
+	finish(nil)
+
+	return *val, true, nil
+}
+
+// Expire sets the remaining lifetime of key.
+func (c *redisCache[T]) Expire(ctx context.Context, key string, ttl time.Duration) (bool, error) {
+	if ttl <= 0 {
+		return false, errors.New("cache: expire requires a positive ttl")
+	}
+
+	con, err := c.connection()
+	if err != nil {
+		return false, err
+	}
+
+	finish := c.observe(ctx, InstrumentationSet, key)
+
+	applied, err := con.Do(ctx, con.B().Pexpire().Key(c.prefix+key).Milliseconds(ttl.Milliseconds()).Build()).AsBool()
+	if err != nil {
+		err = connError(err)
+		finish(err)
+
+		return false, err
+	}
+
+	finish(nil)
+
+	return applied, nil
+}
+
 func (c *redisCache[T]) Delete(ctx context.Context, key string) error {
 	con, err := c.connection()
 	if err != nil {
