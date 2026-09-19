@@ -1,6 +1,7 @@
 package http
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"io"
@@ -10,7 +11,29 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func (c client) call(req *Request) ([]byte, error) {
+func (c client) newRequest(url, method string, body []byte, opt []RequestOption) (*Request, error) {
+	req := c.NewRequest()
+
+	if err := req.SetRequestURL(url); err != nil {
+		c.ReleaseRequest(req)
+
+		return nil, err
+	}
+
+	req.apply(opt)
+
+	if method != "" {
+		req.Header.SetMethod(method)
+	}
+
+	if body != nil {
+		req.SetBodyRaw(body)
+	}
+
+	return req, nil
+}
+
+func (c client) do(req *Request, fn func([]byte) error) error {
 	resp := c.NewResponse()
 	defer c.ReleaseResponse(resp)
 
@@ -18,14 +41,29 @@ func (c client) call(req *Request) ([]byte, error) {
 	c.ReleaseRequest(req)
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := resp.Error(); err != nil {
-		return nil, err
+		return err
 	}
 
 	body, err := resp.BodyUncompressed()
+	if err != nil {
+		return err
+	}
+
+	return fn(body)
+}
+
+func (c client) doRaw(req *Request) ([]byte, error) {
+	var body []byte
+
+	err := c.do(req, func(b []byte) error {
+		body = bytes.Clone(b)
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -33,30 +71,34 @@ func (c client) call(req *Request) ([]byte, error) {
 	return body, nil
 }
 
+func (c client) doJSON(req *Request, v any) error {
+	return c.do(req, func(b []byte) error {
+		if len(b) == 0 {
+			return nil
+		}
+
+		return json.Unmarshal(b, v)
+	})
+}
+
 // Get performs a GET request to the specified URL.
 func (c client) Get(url string, opt ...RequestOption) ([]byte, error) {
-	req := c.NewRequest()
-	if err := req.SetRequestURL(url); err != nil {
+	req, err := c.newRequest(url, "", nil, opt)
+	if err != nil {
 		return nil, err
 	}
 
-	req.apply(opt)
-
-	return c.call(req)
+	return c.doRaw(req)
 }
 
 // GetJSON performs a GET request to the specified URL and unmarshals the response into v.
 func (c client) GetJSON(url string, v any, opt ...RequestOption) error {
-	resp, err := c.Get(url, opt...)
+	req, err := c.newRequest(url, "", nil, opt)
 	if err != nil {
 		return err
 	}
 
-	if len(resp) > 0 {
-		return json.Unmarshal(resp, v)
-	}
-
-	return nil
+	return c.doJSON(req, v)
 }
 
 // Query performs a QUERY request to the specified URL.
@@ -64,17 +106,12 @@ func (c client) GetJSON(url string, v any, opt ...RequestOption) error {
 // Request content must have a media type set using the WithHeader Content-Type option (RFC 10008, Section 2.1).
 // From this point onward the body argument must not be changed.
 func (c client) Query(url string, body []byte, opt ...RequestOption) ([]byte, error) {
-	req := c.NewRequest()
-	if err := req.SetRequestURL(url); err != nil {
+	req, err := c.newRequest(url, MethodQuery.String(), body, opt)
+	if err != nil {
 		return nil, err
 	}
 
-	req.apply(opt)
-
-	req.Header.SetMethod(MethodQuery.String())
-	req.SetBodyRaw(body)
-
-	return c.call(req)
+	return c.doRaw(req)
 }
 
 // QueryJSON performs a QUERY request to the specified URL and unmarshals the response into v.
@@ -86,16 +123,12 @@ func (c client) QueryJSON(url string, body, v any, opt ...RequestOption) error {
 
 	opt = append([]RequestOption{WithHeader(HeaderContentType, ContentTypeJSON)}, opt...)
 
-	resp, err := c.Query(url, reqBody, opt...)
+	req, err := c.newRequest(url, MethodQuery.String(), reqBody, opt)
 	if err != nil {
 		return err
 	}
 
-	if len(resp) > 0 {
-		return json.Unmarshal(resp, v)
-	}
-
-	return nil
+	return c.doJSON(req, v)
 }
 
 // QueryForm performs a QUERY request to the specified URL with the specified form values encoded with URL encoding.
@@ -118,17 +151,12 @@ func (c client) QueryForm(url string, form map[string][]string, opt ...RequestOp
 //
 // From this point onward the body argument must not be changed.
 func (c client) Post(url string, body []byte, opt ...RequestOption) ([]byte, error) {
-	req := c.NewRequest()
-	if err := req.SetRequestURL(url); err != nil {
+	req, err := c.newRequest(url, MethodPost.String(), body, opt)
+	if err != nil {
 		return nil, err
 	}
 
-	req.apply(opt)
-
-	req.Header.SetMethod(MethodPost.String())
-	req.SetBodyRaw(body)
-
-	return c.call(req)
+	return c.doRaw(req)
 }
 
 // PostJSON performs a POST request to the specified URL and unmarshals the response into v.
@@ -140,16 +168,12 @@ func (c client) PostJSON(url string, body, v any, opt ...RequestOption) error {
 
 	opt = append([]RequestOption{WithHeader(HeaderContentType, ContentTypeJSON)}, opt...)
 
-	resp, err := c.Post(url, reqBody, opt...)
+	req, err := c.newRequest(url, MethodPost.String(), reqBody, opt)
 	if err != nil {
 		return err
 	}
 
-	if len(resp) > 0 {
-		return json.Unmarshal(resp, v)
-	}
-
-	return nil
+	return c.doJSON(req, v)
 }
 
 // PostForm performs a POST request to the specified URL with the specified form values encoded with URL encoding.
@@ -198,22 +222,17 @@ func (c client) PostMultipartForm(url string, form *multipart.Form, opt ...Reque
 	req.SetBodyRaw(buf.Bytes())
 	c.BufferPool.Put(buf)
 
-	return c.call(req)
+	return c.doRaw(req)
 }
 
 // Put performs a PUT request to the specified URL.
 func (c client) Put(url string, body []byte, opt ...RequestOption) ([]byte, error) {
-	req := c.NewRequest()
-	if err := req.SetRequestURL(url); err != nil {
+	req, err := c.newRequest(url, MethodPut.String(), body, opt)
+	if err != nil {
 		return nil, err
 	}
 
-	req.apply(opt)
-
-	req.Header.SetMethod(MethodPut.String())
-	req.SetBodyRaw(body)
-
-	return c.call(req)
+	return c.doRaw(req)
 }
 
 // PutJSON performs a PUT request to the specified URL and unmarshals the response into v.
@@ -225,31 +244,22 @@ func (c client) PutJSON(url string, body, v any, opt ...RequestOption) error {
 
 	opt = append([]RequestOption{WithHeader(HeaderContentType, ContentTypeJSON)}, opt...)
 
-	resp, err := c.Put(url, reqBody, opt...)
+	req, err := c.newRequest(url, MethodPut.String(), reqBody, opt)
 	if err != nil {
 		return err
 	}
 
-	if len(resp) > 0 {
-		return json.Unmarshal(resp, v)
-	}
-
-	return nil
+	return c.doJSON(req, v)
 }
 
 // Patch performs a PATCH request to the specified URL.
 func (c client) Patch(url string, body []byte, opt ...RequestOption) ([]byte, error) {
-	req := c.NewRequest()
-	if err := req.SetRequestURL(url); err != nil {
+	req, err := c.newRequest(url, MethodPatch.String(), body, opt)
+	if err != nil {
 		return nil, err
 	}
 
-	req.apply(opt)
-
-	req.Header.SetMethod(MethodPatch.String())
-	req.SetBodyRaw(body)
-
-	return c.call(req)
+	return c.doRaw(req)
 }
 
 // PatchJSON performs a PATCH request to the specified URL and unmarshals the response into v.
@@ -261,30 +271,22 @@ func (c client) PatchJSON(url string, body, v any, opt ...RequestOption) error {
 
 	opt = append([]RequestOption{WithHeader(HeaderContentType, ContentTypeJSON)}, opt...)
 
-	resp, err := c.Patch(url, reqBody, opt...)
+	req, err := c.newRequest(url, MethodPatch.String(), reqBody, opt)
 	if err != nil {
 		return err
 	}
 
-	if len(resp) > 0 {
-		return json.Unmarshal(resp, v)
-	}
-
-	return nil
+	return c.doJSON(req, v)
 }
 
 // Delete performs a DELETE request to the specified URL.
 func (c client) Delete(url string, opt ...RequestOption) ([]byte, error) {
-	req := c.NewRequest()
-	if err := req.SetRequestURL(url); err != nil {
+	req, err := c.newRequest(url, MethodDelete.String(), nil, opt)
+	if err != nil {
 		return nil, err
 	}
 
-	req.apply(opt)
-
-	req.Header.SetMethod(MethodDelete.String())
-
-	return c.call(req)
+	return c.doRaw(req)
 }
 
 // DeleteJSON performs a DELETE request to the specified URL and unmarshals the response into v.
@@ -300,14 +302,10 @@ func (c client) DeleteJSON(url string, body, v any, opt ...RequestOption) error 
 		}
 	}
 
-	resp, err := c.Delete(url, opt...)
+	req, err := c.newRequest(url, MethodDelete.String(), nil, opt)
 	if err != nil {
 		return err
 	}
 
-	if len(resp) > 0 {
-		return json.Unmarshal(resp, v)
-	}
-
-	return nil
+	return c.doJSON(req, v)
 }

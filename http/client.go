@@ -157,12 +157,15 @@ func NewClient(opt ...Option) Client {
 			Instrumenter:  opts.Instrumenter,
 		},
 		c: &fasthttp.Client{
-			Name:               opts.UserAgent,
-			TLSConfig:          opts.TLSConfig,
-			Dial:               opts.Dial,
-			Transport:          opts.Transport,
-			RetryIfErr:         retryIfErr,
-			StreamResponseBody: opts.StreamResponse,
+			Name:                opts.UserAgent,
+			TLSConfig:           opts.TLSConfig,
+			Dial:                opts.Dial,
+			Transport:           opts.Transport,
+			RetryIfErr:          retryIfErr,
+			StreamResponseBody:  opts.StreamResponse,
+			ReadTimeout:         opts.Timeout,
+			WriteTimeout:        opts.Timeout,
+			MaxResponseBodySize: opts.MaxResponseBody,
 		},
 		baseURL: opts.BaseURL,
 		ctx:     opts.Context,
@@ -186,7 +189,12 @@ func (c client) Do(req *Request, resp *Response) error {
 
 	finish := c.Instrumenter.Observe(c.ctx, InstrumentationRequest, req, resp)
 
-	err := c.c.Do(req.Request, resp.Response)
+	var err error
+	if deadline, ok := c.ctx.Deadline(); ok {
+		err = c.c.DoDeadline(req.Request, resp.Response, deadline)
+	} else {
+		err = c.c.Do(req.Request, resp.Response)
+	}
 
 	if c.ctx.Err() != nil {
 		finish(c.ctx.Err())

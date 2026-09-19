@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"net"
+	"time"
 
 	"azugo.io/core/instrumenter"
 
@@ -23,6 +24,8 @@ type options struct {
 	ResponseModifiers []ResponseFunc
 	Configuration     *Configuration
 	StreamResponse    bool
+	Timeout           time.Duration
+	MaxResponseBody   int
 }
 
 func (o *options) apply(opts []Option) {
@@ -134,4 +137,18 @@ type StreamResponse bool
 
 func (s StreamResponse) apply(o *options) {
 	o.StreamResponse = bool(s)
+}
+
+// Timeout for writing a request and reading its response.
+type Timeout time.Duration
+
+func (t Timeout) apply(o *options) {
+	o.Timeout = time.Duration(t)
+}
+
+// MaxResponseBody caps the response body the client will read.
+type MaxResponseBody int
+
+func (m MaxResponseBody) apply(o *options) {
+	o.MaxResponseBody = int(m)
 }
