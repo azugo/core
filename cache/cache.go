@@ -80,6 +80,8 @@ type Instance[T any] interface {
 	Swap(ctx context.Context, key string, value T, opts ...ItemOption[T]) (T, bool, error)
 	// Expire sets the remaining lifetime of key without changing its value.
 	Expire(ctx context.Context, key string, ttl time.Duration) (bool, error)
+	// TTL returns how much lifetime key has left and whether it is present at all.
+	TTL(ctx context.Context, key string) (time.Duration, bool, error)
 	// Delete value from cache.
 	Delete(ctx context.Context, key string) error
 	// Sync blocks until every write issued so far is visible to reads.

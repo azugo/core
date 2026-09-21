@@ -380,6 +380,37 @@ func (c *memoryCache[T]) Expire(ctx context.Context, key string, ttl time.Durati
 	return true, nil
 }
 
+// TTL returns how much lifetime key has left and whether it is present at all.
+func (c *memoryCache[T]) TTL(ctx context.Context, key string) (time.Duration, bool, error) {
+	finish := c.observe(ctx, InstrumentationGet, key)
+
+	if c.serialize {
+		if c.serializedCache == nil {
+			finish(ErrCacheClosed)
+
+			return 0, false, ErrCacheClosed
+		}
+
+		ttl, found := c.serializedCache.GetTTL(key)
+
+		finish(nil)
+
+		return ttl, found, nil
+	}
+
+	if c.cache == nil {
+		finish(ErrCacheClosed)
+
+		return 0, false, ErrCacheClosed
+	}
+
+	ttl, found := c.cache.GetTTL(key)
+
+	finish(nil)
+
+	return ttl, found, nil
+}
+
 // peek returns the stored value without recording a hit or consulting the loader.
 func (c *memoryCache[T]) peek(key string) (T, bool, error) {
 	var val T

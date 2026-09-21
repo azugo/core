@@ -3,7 +3,6 @@ package cache
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/valkey-io/valkey-go"
 )
@@ -57,18 +56,7 @@ func (c *memoryCounter) Increment(ctx context.Context, key string, delta int64, 
 	}
 
 	if found {
-		var (
-			remaining time.Duration
-			timed     bool
-		)
-
-		if c.serialize {
-			remaining, timed = c.serializedCache.GetTTL(key)
-		} else {
-			remaining, timed = c.cache.GetTTL(key)
-		}
-
-		if timed {
+		if remaining, _, err := c.TTL(ctx, key); err == nil && remaining > 0 {
 			ttl = remaining
 		}
 	}

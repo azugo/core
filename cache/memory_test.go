@@ -321,3 +321,36 @@ func TestMemoryCacheExpireExtendsWithoutChangingValue(t *testing.T) {
 	_, err = i.Expire(context.TODO(), "key", 0)
 	qt.Check(t, qt.IsNotNil(err))
 }
+
+func TestMemoryCacheTTL(t *testing.T) {
+	c := New(MemoryCache)
+	qt.Assert(t, qt.IsNil(c.Start(context.TODO())))
+
+	defer c.Close()
+
+	i, err := Create[string](c, "test")
+	qt.Assert(t, qt.IsNil(err))
+
+	// A missing key is absent, not merely expiry-less.
+	ttl, found, err := i.TTL(context.TODO(), "key")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsFalse(found))
+	qt.Check(t, qt.Equals(ttl, time.Duration(0)))
+
+	qt.Assert(t, qt.IsNil(i.Set(context.TODO(), "key", "value", TTL[string](time.Minute))))
+	qt.Assert(t, qt.IsNil(i.Sync(context.TODO())))
+
+	ttl, found, err = i.TTL(context.TODO(), "key")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(found))
+	qt.Check(t, qt.IsTrue(ttl > 59*time.Second && ttl <= time.Minute), qt.Commentf("got %s", ttl))
+
+	// Expire re-times it, and the read reflects that.
+	applied, err := i.Expire(context.TODO(), "key", time.Hour)
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(applied))
+
+	ttl, _, err = i.TTL(context.TODO(), "key")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(ttl > 59*time.Minute), qt.Commentf("got %s", ttl))
+}

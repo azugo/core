@@ -357,3 +357,32 @@ func TestRedisCacheAddSwapExpire(t *testing.T) {
 	qt.Check(t, qt.IsFalse(found))
 	qt.Check(t, qt.Equals(prev, ""))
 }
+
+func TestRedisCacheTTL(t *testing.T) {
+	cs := getRedisConnStr()
+	if cs == "" {
+		t.Skip("REDIS_CONNSTR is not set")
+	}
+
+	c := New(RedisCache, KeyPrefix("prefix"), ConnectionString(cs))
+	qt.Assert(t, qt.IsNil(c.Start(context.TODO())))
+
+	defer c.Close()
+
+	i, err := Create[string](c, "test")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Assert(t, qt.IsNil(i.Delete(context.TODO(), "ttl")))
+
+	_, found, err := i.TTL(context.TODO(), "ttl")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsFalse(found))
+
+	qt.Assert(t, qt.IsNil(i.Set(context.TODO(), "ttl", "value", TTL[string](time.Minute))))
+
+	ttl, found, err := i.TTL(context.TODO(), "ttl")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(found))
+	qt.Check(t, qt.IsTrue(ttl > 59*time.Second && ttl <= time.Minute), qt.Commentf("got %s", ttl))
+
+	qt.Assert(t, qt.IsNil(i.Delete(context.TODO(), "ttl")))
+}

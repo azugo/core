@@ -584,6 +584,35 @@ func (c *redisCache[T]) Expire(ctx context.Context, key string, ttl time.Duratio
 	return applied, nil
 }
 
+// TTL returns how much lifetime key has left and whether it is present at all.
+func (c *redisCache[T]) TTL(ctx context.Context, key string) (time.Duration, bool, error) {
+	con, err := c.connection()
+	if err != nil {
+		return 0, false, err
+	}
+
+	finish := c.observe(ctx, InstrumentationGet, key)
+
+	ms, err := con.Do(ctx, con.B().Pttl().Key(c.prefix+key).Build()).AsInt64()
+	if err != nil {
+		err = connError(err)
+		finish(err)
+
+		return 0, false, err
+	}
+
+	finish(nil)
+
+	switch {
+	case ms == -2:
+		return 0, false, nil
+	case ms < 0:
+		return 0, true, nil
+	default:
+		return time.Duration(ms) * time.Millisecond, true, nil
+	}
+}
+
 func (c *redisCache[T]) Delete(ctx context.Context, key string) error {
 	con, err := c.connection()
 	if err != nil {
