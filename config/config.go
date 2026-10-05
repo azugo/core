@@ -166,7 +166,7 @@ func (c *Configuration) Load(cmd *cobra.Command, config any, environment string)
 	}
 
 	if err := c.v.ReadInConfig(); err != nil {
-		if !errors.As(err, &viper.ConfigFileNotFoundError{}) {
+		if _, ok := errors.AsType[viper.ConfigFileNotFoundError](err); !ok {
 			return fmt.Errorf("failed to read configuration: %w", err)
 		}
 	}
@@ -175,7 +175,7 @@ func (c *Configuration) Load(cmd *cobra.Command, config any, environment string)
 		c.v.SetConfigName(c.configName + "." + environment)
 
 		if err := c.v.MergeInConfig(); err != nil {
-			if !errors.As(err, &viper.ConfigFileNotFoundError{}) {
+			if _, ok := errors.AsType[viper.ConfigFileNotFoundError](err); !ok {
 				return fmt.Errorf("failed to merge configuration: %w", err)
 			}
 		}

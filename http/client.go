@@ -271,6 +271,9 @@ func (c client) WithOptions(opt ...Option) Client {
 		RetryIf:           c.c.RetryIfErr,
 		UserAgent:         c.c.Name,
 		BaseURL:           c.baseURL,
+		StreamResponse:    c.c.StreamResponseBody,
+		Timeout:           c.c.ReadTimeout,
+		MaxResponseBody:   c.c.MaxResponseBodySize,
 	}
 	opts.apply(opt)
 
@@ -291,12 +294,15 @@ func (c client) WithOptions(opt ...Option) Client {
 			Instrumenter:  opts.Instrumenter,
 		},
 		c: &fasthttp.Client{
-			Name:               opts.UserAgent,
-			TLSConfig:          opts.TLSConfig,
-			Dial:               opts.Dial,
-			Transport:          opts.Transport,
-			RetryIfErr:         retryIfErr,
-			StreamResponseBody: opts.StreamResponse,
+			Name:                opts.UserAgent,
+			TLSConfig:           opts.TLSConfig,
+			Dial:                opts.Dial,
+			Transport:           opts.Transport,
+			RetryIfErr:          retryIfErr,
+			StreamResponseBody:  opts.StreamResponse,
+			ReadTimeout:         opts.Timeout,
+			WriteTimeout:        opts.Timeout,
+			MaxResponseBodySize: opts.MaxResponseBody,
 		},
 		baseURL: opts.BaseURL,
 		ctx:     opts.Context,

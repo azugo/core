@@ -638,3 +638,55 @@ func TestClientWithConfiguration(t *testing.T) {
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.Equals(string(body), ""))
 }
+
+func TestClientWithOptionsKeepsSettings(t *testing.T) {
+	c := NewClient(StreamResponse(true), Timeout(5*time.Second), MaxResponseBody(1024)).WithOptions(UserAgent("test"))
+
+	fc := c.(*client).c
+	qt.Check(t, qt.Equals(fc.Name, "test"))
+	qt.Check(t, qt.IsTrue(fc.StreamResponseBody))
+	qt.Check(t, qt.Equals(fc.ReadTimeout, 5*time.Second))
+	qt.Check(t, qt.Equals(fc.WriteTimeout, 5*time.Second))
+	qt.Check(t, qt.Equals(fc.MaxResponseBodySize, 1024))
+}
+
+func TestResponseReadBody(t *testing.T) {
+	s := newTestHttpServer()
+	s.Handler = func(ctx *fasthttp.RequestCtx) {
+		ctx.SetBodyString("Hello World")
+	}
+	s.Start()
+	defer s.Stop()
+
+	tests := []struct {
+		name   string
+		stream bool
+		limit  int
+		body   string
+		err    error
+	}{
+		{name: "buffered", limit: 11, body: "Hello World"},
+		{name: "buffered too large", limit: 5, body: "Hello", err: fasthttp.ErrBodyTooLarge},
+		{name: "stream", stream: true, limit: 11, body: "Hello World"},
+		{name: "stream too large", stream: true, limit: 5, body: "Hello", err: fasthttp.ErrBodyTooLarge},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := NewClient(s.DialContext(), StreamResponse(tt.stream))
+
+			req := c.NewRequest()
+			defer c.ReleaseRequest(req)
+
+			resp := c.NewResponse()
+			defer c.ReleaseResponse(resp)
+
+			req.SetRequestURI("http://localhost:8080/")
+			qt.Assert(t, qt.IsNil(c.Do(req, resp)))
+
+			body, err := resp.ReadBody(tt.limit)
+			qt.Check(t, qt.ErrorIs(err, tt.err))
+			qt.Check(t, qt.Equals(string(body), tt.body))
+		})
+	}
+}

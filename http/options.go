@@ -133,6 +133,8 @@ func (i Instrumenter) apply(c *options) {
 }
 
 // StreamResponse enables receiving response as a stream for the HTTP client.
+//
+// The response body stream must be closed with Response.CloseBodyStream or read with Response.ReadBody.
 type StreamResponse bool
 
 func (s StreamResponse) apply(o *options) {
