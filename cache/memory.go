@@ -284,16 +284,12 @@ func (c *memoryCache[T]) Pop(ctx context.Context, key string) (T, error) {
 }
 
 func (c *memoryCache[T]) Set(ctx context.Context, key string, value T, opts ...ItemOption[T]) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	finish := c.observe(ctx, InstrumentationSet, key)
 
-	opt := newItemOptions(opts...)
-
-	ttl := opt.TTL
-	if ttl == 0 {
-		ttl = c.ttl
-	}
-
-	err := c.set(key, value, ttl)
+	err := c.write(key, value, opts...)
 
 	finish(err)
 
@@ -461,6 +457,9 @@ func (c *memoryCache[T]) write(key string, value T, opts ...ItemOption[T]) error
 }
 
 func (c *memoryCache[T]) Delete(ctx context.Context, key string) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	finish := c.observe(ctx, InstrumentationDelete, key)
 	defer finish(nil)
 

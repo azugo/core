@@ -354,3 +354,58 @@ func TestMemoryCacheTTL(t *testing.T) {
 	qt.Assert(t, qt.IsNil(err))
 	qt.Check(t, qt.IsTrue(ttl > 59*time.Minute), qt.Commentf("got %s", ttl))
 }
+
+func TestMemoryCacheAddSeesPrecedingSet(t *testing.T) {
+	c := New(MemoryCache)
+	qt.Assert(t, qt.IsNil(c.Start(context.TODO())))
+	defer c.Close()
+
+	i, err := Create[string](c, "test")
+	qt.Assert(t, qt.IsNil(err))
+
+	for n := range 1000 {
+		key := strconv.Itoa(n)
+
+		qt.Assert(t, qt.IsNil(i.Set(context.TODO(), key, "set")))
+
+		added, err := i.Add(context.TODO(), key, "add")
+		qt.Assert(t, qt.IsNil(err))
+		qt.Assert(t, qt.IsFalse(added))
+
+		val, err := i.Get(context.TODO(), key)
+		qt.Assert(t, qt.IsNil(err))
+		qt.Assert(t, qt.Equals(val, "set"))
+	}
+}
+
+func TestMemoryCacheExpireDoesNotRestoreDeletedKey(t *testing.T) {
+	c := New(MemoryCache)
+	qt.Assert(t, qt.IsNil(c.Start(context.TODO())))
+	defer c.Close()
+
+	i, err := Create[string](c, "test")
+	qt.Assert(t, qt.IsNil(err))
+
+	for n := range 1000 {
+		key := strconv.Itoa(n)
+
+		qt.Assert(t, qt.IsNil(i.Set(context.TODO(), key, "value")))
+		qt.Assert(t, qt.IsNil(i.Sync(context.TODO())))
+
+		var wg sync.WaitGroup
+
+		wg.Go(func() {
+			_ = i.Delete(context.TODO(), key)
+		})
+		wg.Go(func() {
+			_, _ = i.Expire(context.TODO(), key, time.Minute)
+		})
+		wg.Wait()
+
+		qt.Assert(t, qt.IsNil(i.Sync(context.TODO())))
+
+		_, found, err := i.TTL(context.TODO(), key)
+		qt.Assert(t, qt.IsNil(err))
+		qt.Assert(t, qt.IsFalse(found))
+	}
+}
