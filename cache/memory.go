@@ -24,6 +24,7 @@ type memoryCache[T any] struct {
 	prefix          string
 	ttl             time.Duration
 	serialize       bool
+	sensitive       bool
 	lock            sync.Mutex
 	loader          func(ctx context.Context, key string) (any, error)
 	instrumenter    instrumenter.Instrumenter
@@ -42,6 +43,7 @@ func newMemoryCache[T any](prefix string, opts ...Option) (Instance[T], error) {
 		prefix:       keyPrefix + prefix + ":",
 		ttl:          opt.TTL,
 		serialize:    opt.Serialize,
+		sensitive:    opt.SensitiveKeys,
 		instrumenter: opt.Instrumenter,
 	}
 
@@ -72,7 +74,12 @@ func newMemoryCache[T any](prefix string, opts ...Option) (Instance[T], error) {
 	if opt.Loader != nil {
 		loader := opt.Loader
 		mc.loader = func(ctx context.Context, key string) (any, error) {
-			finish := instrumenter.ObserveKey(ctx, opt.Instrumenter, InstrumentationLoader, key)
+			observed := key
+			if opt.SensitiveKeys {
+				observed = mc.prefix + redactedKey
+			}
+
+			finish := instrumenter.ObserveKey(ctx, opt.Instrumenter, InstrumentationLoader, observed)
 			v, err := loader(ctx, key)
 			finish(err)
 
@@ -86,6 +93,10 @@ func newMemoryCache[T any](prefix string, opts ...Option) (Instance[T], error) {
 func (c *memoryCache[T]) observe(ctx context.Context, op, key string) func(error) {
 	if c.instrumenter.Empty() {
 		return instrumenter.NullFinish
+	}
+
+	if c.sensitive {
+		key = redactedKey
 	}
 
 	return c.instrumenter.Observe(ctx, op, c.prefix+key, string(MemoryCache), c.name)
@@ -305,6 +316,31 @@ func (c *memoryCache[T]) Add(ctx context.Context, key string, value T, opts ...I
 
 	_, found, err := c.peek(key)
 	if err != nil || found {
+		finish(err)
+
+		return false, err
+	}
+
+	if err := c.write(key, value, opts...); err != nil {
+		finish(err)
+
+		return false, err
+	}
+
+	finish(nil)
+
+	return true, nil
+}
+
+// Replace stores value under key only when a value is present.
+func (c *memoryCache[T]) Replace(ctx context.Context, key string, value T, opts ...ItemOption[T]) (bool, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	finish := c.observe(ctx, InstrumentationSet, key)
+
+	_, found, err := c.peek(key)
+	if err != nil || !found {
 		finish(err)
 
 		return false, err

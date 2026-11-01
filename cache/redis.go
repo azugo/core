@@ -36,6 +36,7 @@ type redisCache[T any] struct {
 	clientCacheTTL time.Duration
 	loader         func(ctx context.Context, key string) (any, error)
 	instrumenter   instrumenter.Instrumenter
+	sensitive      bool
 }
 
 func newRedisCache[T any](prefix string, cache *Cache, opts ...Option) (Instance[T], error) {
@@ -49,7 +50,12 @@ func newRedisCache[T any](prefix string, cache *Cache, opts ...Option) (Instance
 	loader := opt.Loader
 	if loader != nil {
 		loader = func(ctx context.Context, key string) (any, error) {
-			finish := instrumenter.ObserveKey(ctx, opt.Instrumenter, InstrumentationLoader, key)
+			observed := key
+			if opt.SensitiveKeys {
+				observed = keyPrefix + prefix + ":" + redactedKey
+			}
+
+			finish := instrumenter.ObserveKey(ctx, opt.Instrumenter, InstrumentationLoader, observed)
 			v, err := opt.Loader(ctx, key)
 			finish(err)
 
@@ -65,6 +71,7 @@ func newRedisCache[T any](prefix string, cache *Cache, opts ...Option) (Instance
 		ttl:            opt.TTL,
 		clientCacheTTL: opt.ClientCacheTTL,
 		loader:         loader,
+		sensitive:      opt.SensitiveKeys,
 		instrumenter:   opt.Instrumenter,
 	}
 
@@ -133,6 +140,10 @@ func (c *redisCache[T]) connection() (valkey.Client, error) {
 func (c *redisCache[T]) observe(ctx context.Context, op, key string) func(error) {
 	if c.instrumenter.Empty() {
 		return instrumenter.NullFinish
+	}
+
+	if c.sensitive {
+		key = redactedKey
 	}
 
 	return c.instrumenter.Observe(ctx, op, c.prefix+key, string(c.typ), c.name)
@@ -445,8 +456,18 @@ func (c *redisCache[T]) Set(ctx context.Context, key string, value T, opts ...It
 	return nil
 }
 
-// Add stores value under key when no value is present.
+// Add stores value under key only when no value is present.
 func (c *redisCache[T]) Add(ctx context.Context, key string, value T, opts ...ItemOption[T]) (bool, error) {
+	return c.setIf(ctx, key, value, false, opts)
+}
+
+// Replace stores value under key only when a value is present.
+func (c *redisCache[T]) Replace(ctx context.Context, key string, value T, opts ...ItemOption[T]) (bool, error) {
+	return c.setIf(ctx, key, value, true, opts)
+}
+
+// setIf stores value under key only when its presence matches present, as SET XX or SET NX.
+func (c *redisCache[T]) setIf(ctx context.Context, key string, value T, present bool, opts []ItemOption[T]) (bool, error) {
 	con, err := c.connection()
 	if err != nil {
 		return false, err
@@ -469,13 +490,19 @@ func (c *redisCache[T]) Add(ctx context.Context, key string, value T, opts ...It
 		ttl = opt.TTL
 	}
 
-	cmd := con.B().Set().Key(c.prefix + key).Value(string(buf)).Nx()
+	cmd := con.B().Set().Key(c.prefix + key).Value(string(buf))
 
 	var completed valkey.Completed
-	if ttl > 0 {
-		completed = cmd.Px(ttl).Build()
-	} else {
-		completed = cmd.Build()
+
+	switch {
+	case present && ttl > 0:
+		completed = cmd.Xx().Px(ttl).Build()
+	case present:
+		completed = cmd.Xx().Build()
+	case ttl > 0:
+		completed = cmd.Nx().Px(ttl).Build()
+	default:
+		completed = cmd.Nx().Build()
 	}
 
 	err = con.Do(ctx, completed).Error()

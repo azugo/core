@@ -358,6 +358,84 @@ func TestRedisCacheAddSwapExpire(t *testing.T) {
 	qt.Check(t, qt.Equals(prev, ""))
 }
 
+func TestRedisCacheReplace(t *testing.T) {
+	cs := getRedisConnStr()
+	if cs == "" {
+		t.Skip("REDIS_CONNSTR is not set")
+	}
+
+	c := New(RedisCache, KeyPrefix("prefix"), ConnectionString(cs))
+	qt.Assert(t, qt.IsNil(c.Start(context.TODO())))
+
+	defer c.Close()
+
+	i, err := Create[string](c, "test")
+	qt.Assert(t, qt.IsNil(err))
+
+	qt.Assert(t, qt.IsNil(i.Delete(context.TODO(), "replace")))
+
+	replaced, err := i.Replace(context.TODO(), "replace", "value")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsFalse(replaced))
+
+	_, found, err := i.TTL(context.TODO(), "replace")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsFalse(found))
+
+	qt.Assert(t, qt.IsNil(i.Set(context.TODO(), "replace", "first")))
+
+	replaced, err = i.Replace(context.TODO(), "replace", "second", TTL[string](time.Minute))
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(replaced))
+
+	val, err := i.Get(context.TODO(), "replace")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(val, "second"))
+
+	ttl, found, err := i.TTL(context.TODO(), "replace")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(found))
+	qt.Check(t, qt.IsTrue(ttl > 0 && ttl <= time.Minute))
+
+	qt.Assert(t, qt.IsNil(i.Delete(context.TODO(), "replace")))
+}
+
+func TestRedisCacheSensitiveKeys(t *testing.T) {
+	cs := getRedisConnStr()
+	if cs == "" {
+		t.Skip("REDIS_CONNSTR is not set")
+	}
+
+	var keys []string
+
+	instr := func(_ context.Context, op string, args ...any) func(error) {
+		if key, ok := InstrSet(op, args...); ok {
+			keys = append(keys, key)
+		}
+
+		return instrumenter.NullFinish
+	}
+
+	c := New(RedisCache, KeyPrefix("prefix"), ConnectionString(cs), Instrumenter(instr))
+	qt.Assert(t, qt.IsNil(c.Start(context.TODO())))
+
+	defer c.Close()
+
+	secret, err := Create[string](c, "sessions", SensitiveKeys())
+	qt.Assert(t, qt.IsNil(err))
+
+	plain, err := Create[string](c, "plain")
+	qt.Assert(t, qt.IsNil(err))
+
+	qt.Assert(t, qt.IsNil(secret.Set(context.TODO(), "sid", "value")))
+	qt.Assert(t, qt.IsNil(plain.Set(context.TODO(), "key", "value")))
+
+	qt.Check(t, qt.DeepEquals(keys, []string{"prefix:sessions:<redacted>", "prefix:plain:key"}))
+
+	qt.Assert(t, qt.IsNil(secret.Delete(context.TODO(), "sid")))
+	qt.Assert(t, qt.IsNil(plain.Delete(context.TODO(), "key")))
+}
+
 func TestRedisCacheTTL(t *testing.T) {
 	cs := getRedisConnStr()
 	if cs == "" {

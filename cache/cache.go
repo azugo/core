@@ -76,6 +76,8 @@ type Instance[T any] interface {
 	Set(ctx context.Context, key string, value T, opts ...ItemOption[T]) error
 	// Add stores value under key only when no value is present.
 	Add(ctx context.Context, key string, value T, opts ...ItemOption[T]) (bool, error)
+	// Replace stores value under key only when a value is present.
+	Replace(ctx context.Context, key string, value T, opts ...ItemOption[T]) (bool, error)
 	// Swap stores value under key and returns the value it replaced.
 	Swap(ctx context.Context, key string, value T, opts ...ItemOption[T]) (T, bool, error)
 	// Expire sets the remaining lifetime of key without changing its value.

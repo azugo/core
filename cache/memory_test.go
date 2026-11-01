@@ -409,3 +409,120 @@ func TestMemoryCacheExpireDoesNotRestoreDeletedKey(t *testing.T) {
 		qt.Assert(t, qt.IsFalse(found))
 	}
 }
+
+func TestMemoryCacheReplace(t *testing.T) {
+	c := New(MemoryCache)
+	qt.Assert(t, qt.IsNil(c.Start(context.TODO())))
+	defer c.Close()
+
+	i, err := Create[string](c, "test")
+	qt.Assert(t, qt.IsNil(err))
+
+	replaced, err := i.Replace(context.TODO(), "key", "value")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsFalse(replaced))
+
+	_, found, err := i.TTL(context.TODO(), "key")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsFalse(found))
+
+	qt.Assert(t, qt.IsNil(i.Set(context.TODO(), "key", "first")))
+
+	replaced, err = i.Replace(context.TODO(), "key", "second", TTL[string](time.Minute))
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(replaced))
+
+	val, err := i.Get(context.TODO(), "key")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(val, "second"))
+
+	ttl, found, err := i.TTL(context.TODO(), "key")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.IsTrue(found))
+	qt.Check(t, qt.IsTrue(ttl > 0 && ttl <= time.Minute))
+}
+
+func TestMemoryCacheReplaceDoesNotRestoreDeletedKey(t *testing.T) {
+	c := New(MemoryCache)
+	qt.Assert(t, qt.IsNil(c.Start(context.TODO())))
+	defer c.Close()
+
+	i, err := Create[string](c, "test")
+	qt.Assert(t, qt.IsNil(err))
+
+	for n := range 1000 {
+		key := strconv.Itoa(n)
+
+		qt.Assert(t, qt.IsNil(i.Set(context.TODO(), key, "value")))
+
+		var wg sync.WaitGroup
+
+		wg.Go(func() {
+			_ = i.Delete(context.TODO(), key)
+		})
+		wg.Go(func() {
+			_, _ = i.Replace(context.TODO(), key, "renewed")
+		})
+		wg.Wait()
+
+		qt.Assert(t, qt.IsNil(i.Sync(context.TODO())))
+
+		_, found, err := i.TTL(context.TODO(), key)
+		qt.Assert(t, qt.IsNil(err))
+		qt.Assert(t, qt.IsFalse(found))
+	}
+}
+
+func TestMemoryCacheSensitiveKeys(t *testing.T) {
+	var (
+		mu   sync.Mutex
+		keys []string
+	)
+
+	instr := func(_ context.Context, op string, args ...any) func(error) {
+		if op == InstrumentationGet || op == InstrumentationSet || op == InstrumentationDelete || op == InstrumentationLoader {
+			key, _ := args[0].(string)
+			instance, _ := InstrInstance(args...)
+
+			mu.Lock()
+			keys = append(keys, op+"|"+key+"|"+instance)
+			mu.Unlock()
+		}
+
+		return instrumenter.NullFinish
+	}
+
+	c := New(MemoryCache, Instrumenter(instr))
+	qt.Assert(t, qt.IsNil(c.Start(context.TODO())))
+	defer c.Close()
+
+	loader := Loader(func(context.Context, string) (any, error) {
+		return "loaded", nil
+	})
+
+	secret, err := Create[string](c, "sessions", SensitiveKeys(), loader)
+	qt.Assert(t, qt.IsNil(err))
+
+	plain, err := Create[string](c, "plain")
+	qt.Assert(t, qt.IsNil(err))
+
+	qt.Assert(t, qt.IsNil(secret.Set(context.TODO(), "sid", "value")))
+	qt.Assert(t, qt.IsNil(secret.Delete(context.TODO(), "sid")))
+
+	val, err := secret.Get(context.TODO(), "missing")
+	qt.Assert(t, qt.IsNil(err))
+	qt.Check(t, qt.Equals(val, "loaded"))
+
+	qt.Assert(t, qt.IsNil(plain.Set(context.TODO(), "key", "value")))
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	qt.Check(t, qt.DeepEquals(keys, []string{
+		InstrumentationSet + "|sessions:<redacted>|sessions",
+		InstrumentationDelete + "|sessions:<redacted>|sessions",
+		InstrumentationGet + "|sessions:<redacted>|sessions",
+		InstrumentationLoader + "|sessions:<redacted>|",
+		InstrumentationSet + "|plain:key|plain",
+	}))
+}

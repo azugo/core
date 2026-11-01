@@ -23,6 +23,7 @@ type cacheOptions struct {
 	ClientCache        bool
 	ClientCacheTTL     time.Duration
 	ClientCacheSize    int
+	SensitiveKeys      bool
 }
 
 // Option for the cache instance.
@@ -151,6 +152,19 @@ type ClientCacheSize int
 
 func (v ClientCacheSize) applyCache(c *cacheOptions) {
 	c.ClientCacheSize = int(v)
+}
+
+const redactedKey = "<redacted>"
+
+// SensitiveKeys replaces the instance's keys with "<redacted>" in instrumentation events.
+func SensitiveKeys() Option {
+	return sensitiveKeys{}
+}
+
+type sensitiveKeys struct{}
+
+func (sensitiveKeys) applyCache(c *cacheOptions) {
+	c.SensitiveKeys = true
 }
 
 // Serialize controls whether values are JSON-serialized before storage in the
