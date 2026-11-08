@@ -3,15 +3,15 @@ module azugo.io/core
 go 1.26.0
 
 require (
-	github.com/cenkalti/backoff/v7 v7.0.1
+	github.com/cenkalti/backoff/v7 v7.0.3
 	github.com/dgraph-io/ristretto/v2 v2.4.2
-	github.com/go-playground/validator/v10 v10.30.5
+	github.com/go-playground/validator/v10 v10.30.6
 	github.com/go-quicktest/qt v1.102.0
 	github.com/goccy/go-json v0.12.0
 	github.com/lafriks/pkcs8 v1.2.4
 	github.com/mattn/go-colorable v0.1.16
 	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.0.10
+	github.com/spf13/pflag v1.1.0
 	github.com/spf13/viper v1.21.0
 	github.com/valkey-io/valkey-go v1.0.79
 	github.com/valyala/bytebufferpool v1.0.0
