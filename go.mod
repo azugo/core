@@ -15,10 +15,10 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/valkey-io/valkey-go v1.0.79
 	github.com/valyala/bytebufferpool v1.0.0
-	github.com/valyala/fasthttp v1.78.0
+	github.com/valyala/fasthttp v1.79.0
 	go.elastic.co/ecszap v1.0.3
 	go.uber.org/zap v1.28.0
-	golang.org/x/crypto v0.58.0
+	golang.org/x/crypto v0.59.0
 )
 
 require (
