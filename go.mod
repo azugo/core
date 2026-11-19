@@ -13,7 +13,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.1.0
 	github.com/spf13/viper v1.21.0
-	github.com/valkey-io/valkey-go v1.0.79
+	github.com/valkey-io/valkey-go v1.0.80
 	github.com/valyala/bytebufferpool v1.0.0
 	github.com/valyala/fasthttp v1.79.0
 	go.elastic.co/ecszap v1.0.3
